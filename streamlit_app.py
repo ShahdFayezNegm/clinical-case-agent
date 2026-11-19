@@ -1,6 +1,16 @@
 import json
+import os
 import streamlit as st
 from langchain_core.messages import HumanMessage, ToolMessage
+
+try:
+    api_key = st.secrets.get("OPENROUTER_API_KEY", "")
+except Exception:
+    api_key = ""
+
+if api_key:
+    os.environ["OPENROUTER_API_KEY"] = api_key
+
 from graph_app import graph
 
 
@@ -255,7 +265,7 @@ with st.sidebar:
 
     st.caption("SYSTEM INFORMATION")
     st.caption("Workflow: LangGraph")
-    st.caption("Local model: Ollama")
+    st.caption("Cloud model: OpenRouter")
     st.caption("Mode: Research Prototype")
 
 
@@ -805,7 +815,7 @@ with st.expander("Privacy and Data Handling"):
 st.markdown(
     """
     <div class="footer-text">
-        Clinical Research Workspace · Powered by LangGraph and Ollama
+        Clinical Research Workspace · Powered by LangGraph and OpenRouter
     </div>
     """,
     unsafe_allow_html=True,

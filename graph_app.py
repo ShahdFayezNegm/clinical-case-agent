@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import uuid
 import requests
@@ -8,7 +9,7 @@ from typing import Any
 from itertools import combinations
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.tools import tool
-from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.prebuilt import ToolNode
 
@@ -17,10 +18,12 @@ from langgraph.prebuilt import ToolNode
 # 1. MODEL CONFIGURATION
 # ============================================================
 
-MODEL_NAME = "llama3.2:3b"
+MODEL_NAME = "meta-llama/llama-3.2-3b-instruct:free"
 
-llm = ChatOllama(
+llm = ChatOpenAI(
     model=MODEL_NAME,
+    base_url="https://openrouter.ai/api/v1",
+    api_key=os.getenv("OPENROUTER_API_KEY") or "not-configured",
     temperature=0,
 )
 
@@ -2531,7 +2534,7 @@ def is_evidence_question(question: str) -> bool:
 def agent_node(state: MessagesState) -> dict[str, Any]:
     """
     Decide whether to search PubMed, use the drug interaction
-    tool, or answer with the local Ollama language model.
+    tool, or answer with the OpenRouter language model.
     """
 
     messages = state["messages"]
@@ -2596,8 +2599,21 @@ def agent_node(state: MessagesState) -> dict[str, Any]:
             "messages": [tool_call_message]
         }
 
-    # Priority 3: General questions go to Ollama.
+    # Priority 3: General questions go to OpenRouter.
     print("[ROUTING] use_llm")
+
+    if not os.getenv("OPENROUTER_API_KEY"):
+        return {
+            "messages": [
+                AIMessage(
+                    content=(
+                        "The language model is not configured. "
+                        "Please add OPENROUTER_API_KEY to the "
+                        "application secrets."
+                    )
+                )
+            ]
+        }
 
     try:
         response = llm.invoke(
@@ -2618,7 +2634,8 @@ def agent_node(state: MessagesState) -> dict[str, Any]:
 
     except Exception as exc:
         print(
-            f"[ERROR] Ollama request failed: {exc}"
+            f"[ERROR] OpenRouter request failed: "
+            f"{type(exc).__name__}: {exc}"
         )
 
         return {
@@ -2626,17 +2643,14 @@ def agent_node(state: MessagesState) -> dict[str, Any]:
                 AIMessage(
                     content=(
                         "I could not generate a response because "
-                        "the local language model encountered an "
-                        "error. Check that Ollama is running and "
-                        "that the model "
-                        f"'{MODEL_NAME}' is available. "
+                        "the OpenRouter language model encountered "
+                        "an error. Please try again later. "
                         "Technical detail: "
                         f"{type(exc).__name__}: {exc}"
                     )
                 )
             ]
         }
-
 
 # ============================================================
 # 10. GRAPH ROUTING

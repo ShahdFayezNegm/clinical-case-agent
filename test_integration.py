@@ -1,16 +1,15 @@
-
 import json
+import os
 from unittest.mock import Mock, patch
 
 from langchain_core.messages import AIMessage, HumanMessage
-
+os.environ["OPENROUTER_API_KEY"] = "test-key"
 from graph_app import graph, llm
 
 
 # --------------------------------------------------
 # Helper functions
 # --------------------------------------------------
-
 def make_response(json_data=None, content=b"", status_code=200):
     response = Mock()
     response.status_code = status_code
@@ -56,7 +55,6 @@ def test_graph_end_to_end_drug_interaction():
 # --------------------------------------------------
 # 2. Full workflow: PubMed evidence search
 # --------------------------------------------------
-
 @patch("graph_app.requests.get")
 def test_graph_end_to_end_pubmed_search(mock_get):
 
