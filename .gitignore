@@ -1,0 +1,15 @@
+﻿venv/
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+graph_app_backup.py
+graph_app_before_multi_query.py
+graph_app_llama31_backup.py
+streamlit_app_before_redesign.py
+main.py
+import_times.txt
