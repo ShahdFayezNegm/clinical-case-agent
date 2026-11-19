@@ -653,3 +653,15 @@ def test_pubmed_handles_articles_with_missing_fields(mock_get):
         articles_by_id["202"]["abstract"]
         == "Abstract unavailable"
     )
+
+def test_extract_pubmed_topic_removes_published_studies_prefix():
+    result = extract_pubmed_topic(
+        "Find published clinical studies and systematic reviews reporting "
+        "the diagnostic accuracy of deep learning models for detecting "
+        "diabetic retinopathy from retinal fundus images."
+    )
+
+    assert "diabetic retinopathy" in result.lower()
+    assert "retinal fundus images" in result.lower()
+    assert "published clinical studies" not in result.lower()
+    assert "systematic reviews reporting" not in result.lower()

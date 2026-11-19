@@ -906,6 +906,35 @@ _RELEVANCE_CONCEPTS = {
         "artificial intelligence",
         " ai ",
     ),
+        "diabetic retinopathy": (
+        "diabetic retinopathy",
+        "diabetic retinal disease",
+    ),
+
+    "retinal fundus imaging": (
+        "retinal fundus",
+        "fundus photography",
+        "fundus photograph",
+        "retinal imaging",
+        "fundus image",
+    ),
+
+    "diagnostic accuracy": (
+        "diagnostic accuracy",
+        "sensitivity",
+        "specificity",
+        "area under the curve",
+        "auc",
+        "receiver operating characteristic",
+        "roc",
+    ),
+
+    "systematic review": (
+        "systematic review",
+        "systematic reviews",
+        "meta-analysis",
+        "meta analysis",
+    ),
 }
 
 
@@ -964,6 +993,7 @@ def extract_pubmed_topic(question: str) -> str:
     # Remove common request prefixes
     prefixes = (
         r"^\s*(?:please\s+)?(?:find|search for|search|look up|retrieve)\s+",
+        r"^\s*(?:published\s+)?(?:clinical\s+)?(?:studies|systematic\s+reviews)\s+(?:and\s+systematic\s+reviews\s+)?(?:reporting|that\s+report|about|on|regarding)\s+",
         r"^\s*pubmed\s+(?:about|for|on)\s+",
         r"^\s*(?:medical|scientific|clinical)\s+evidence\s+(?:about|for|on|regarding)\s+",
         r"^\s*(?:clinical\s+)?(?:studies|research|literature|evidence)\s+(?:about|for|on|regarding)\s+",
@@ -972,7 +1002,13 @@ def extract_pubmed_topic(question: str) -> str:
 
     for pattern in prefixes:
         topic = re.sub(pattern, "", topic, flags=re.IGNORECASE).strip()
-
+        # Remove descriptive study-type prefixes
+    topic = re.sub(
+        r"^(?:published\s+)?clinical\s+studies\s+and\s+systematic\s+reviews\s+reporting\s+",
+        "",
+        topic,
+        flags=re.IGNORECASE,
+    ).strip()
     # Handle PubMed evidence requests
     topic = re.sub(
         r"^pubmed\s+evidence\s+(?:comparing|about|for|on|regarding)\s+",
@@ -1268,6 +1304,10 @@ def _relevance_score(
         "drug interaction": 7,
         "clinical study": 2,
         "machine learning": 7,
+        "diabetic retinopathy": 10,
+        "retinal fundus imaging": 7,
+        "diagnostic accuracy": 9,
+        "systematic review": 5,
     }
 
     score = 0
@@ -1463,6 +1503,8 @@ def _extract_study_design(
 
     if "systematic review" in types or "systematic review" in text:
         return "Systematic Review"
+    if "validation study" in types:
+        return "Validation Study"
 
     if re.search(r"\brandomi[sz]ed controlled trial\b|\brandomi[sz]ed clinical trial\b", text):
         return "Randomized Controlled Trial"
@@ -1934,7 +1976,17 @@ def _build_pubmed_queries(
             "25 oh d",
         )
     )
+    has_diabetic_retinopathy = (
+        "diabetic retinopathy" in topic_lower
+    )
 
+    if has_diabetic_retinopathy:
+        queries.extend([
+            "diabetic retinopathy AND deep learning AND fundus",
+            "diabetic retinopathy AND deep learning AND diagnostic accuracy",
+            "diabetic retinopathy AND deep learning AND sensitivity AND specificity",
+            "diabetic retinopathy AND deep learning AND systematic review",
+        ])
     if has_iron_evidence:
         queries.extend([
             "iron deficiency anemia AND ferritin",
@@ -2062,6 +2114,7 @@ def _select_diverse_articles(
 )
     selected_results = []
     covered_queries = set()
+    rejected_by_score = []
 
     minimum_relative_score = 0.8
 
@@ -2075,6 +2128,7 @@ def _select_diverse_articles(
             candidate
             for candidate in ranked_results
             if candidate not in selected_results
+            and candidate.get("matched_queries")
         ]
 
         best_remaining_score = max(
@@ -2085,14 +2139,18 @@ def _select_diverse_articles(
         if article_score(item) >= best_remaining_score * minimum_relative_score:
             selected_results.append(item)
             covered_queries.update(item_queries)
+        else:
+            rejected_by_score.append(item)
 
         if len(selected_results) == limit:
             break
 
     if len(selected_results) < limit:
         for item in ranked_results:
-            if item not in selected_results:
-                selected_results.append(item)
+            if item in selected_results or item in rejected_by_score:
+                continue
+
+            selected_results.append(item)
 
             if len(selected_results) == limit:
                 break

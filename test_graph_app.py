@@ -1768,7 +1768,16 @@ def test_extract_study_design_identifies_meta_analysis():
     )
 
     assert result == "Meta-Analysis"
+def test_extract_study_design_identifies_validation_study():
+    from graph_app import _extract_study_design
 
+    result = _extract_study_design(
+        "Development and Validation of a Deep Learning Algorithm",
+        "The algorithm was evaluated on two independent datasets.",
+        ["Journal Article", "Validation Study"],
+    )
+
+    assert result == "Validation Study"
 
 def test_extract_study_design_identifies_randomized_trial():
     from graph_app import _extract_study_design
@@ -1814,3 +1823,80 @@ def test_extract_study_design_does_not_misclassify_review_as_rct():
     )
 
     assert result == "Review"
+def test_diabetic_retinopathy_queries_cover_diagnostic_accuracy():
+    queries = _build_pubmed_queries(
+        "the diagnostic accuracy of deep learning models for detecting "
+        "diabetic retinopathy from retinal fundus images"
+    )
+
+    combined_queries = " ".join(queries).lower()
+
+    assert any("diabetic retinopathy" in q.lower() for q in queries)
+    assert any("deep learning" in q.lower() for q in queries)
+    assert "diagnostic accuracy" in combined_queries
+    assert "sensitivity" in combined_queries
+    assert "specificity" in combined_queries
+    assert "systematic review" in combined_queries
+def test_diabetic_retinopathy_relevance_rewards_specialized_studies():
+    topic = (
+        "diabetic retinopathy deep learning retinal fundus "
+        "diagnostic accuracy"
+    )
+
+    specialized_score, specialized_matches = _relevance_score(
+        topic,
+        "Diagnostic accuracy of deep learning for diabetic retinopathy "
+        "using retinal fundus photographs",
+        "The study evaluates sensitivity and specificity.",
+    )
+
+    general_score, general_matches = _relevance_score(
+        topic,
+        "Diabetic retinopathy in clinical practice",
+        "A review of screening and management of diabetic retinopathy.",
+    )
+
+    assert specialized_score > general_score
+    assert "diabetic retinopathy" in specialized_matches
+    assert "machine learning" in specialized_matches
+
+
+def test_diabetic_retinopathy_relevance_recognizes_accuracy_terms():
+    topic = "diabetic retinopathy diagnostic accuracy"
+
+    score, matched = _relevance_score(
+        topic,
+        "Sensitivity and specificity of retinal imaging",
+        "Diagnostic accuracy in diabetic retinopathy screening.",
+    )
+
+    assert score > 0
+    assert "diabetic retinopathy" in matched
+def test_select_diverse_articles_fallback_does_not_add_weak_articles():
+    results = [
+        {
+            "title": "Highly relevant article",
+            "relevance_score": 50,
+            "marker_coverage_score": 10,
+            "matched_queries": ["query_1"],
+        },
+        {
+            "title": "Relevant article",
+            "relevance_score": 45,
+            "marker_coverage_score": 8,
+            "matched_queries": ["query_1"],
+        },
+        {
+            "title": "Weakly relevant article",
+            "relevance_score": 5,
+            "marker_coverage_score": 0,
+            "matched_queries": ["query_2"],
+        },
+    ]
+
+    selected = _select_diverse_articles(results, limit=3)
+
+    assert [item["title"] for item in selected] == [
+        "Highly relevant article",
+        "Relevant article",
+    ]
