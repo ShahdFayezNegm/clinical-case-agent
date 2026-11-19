@@ -18,7 +18,7 @@ from langgraph.prebuilt import ToolNode
 # 1. MODEL CONFIGURATION
 # ============================================================
 
-MODEL_NAME = "meta-llama/llama-3.2-3b-instruct:free"
+MODEL_NAME = "meta-llama/llama-3.2-3b-instruct"
 
 llm = ChatOpenAI(
     model=MODEL_NAME,
