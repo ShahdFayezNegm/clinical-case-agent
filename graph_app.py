@@ -2244,6 +2244,7 @@ def search_medical_evidence(
     headers = {
         "User-Agent": "ClinicalCaseInvestigationAgent/1.0"
     }
+    request_stage = "Preparing PubMed search"
 
     try:
                # Build multiple focused queries, or fall back to the original topic.
@@ -2265,6 +2266,7 @@ def search_medical_evidence(
         )
 
         for query_index, search_query in enumerate(search_queries, start=1):
+            request_stage = f"ESearch query {query_index}"
             search_response = requests.get(
                 f"{PUBMED_BASE_URL}/esearch.fcgi",
                 params={
@@ -2334,6 +2336,7 @@ def search_medical_evidence(
                 ensure_ascii=False,
             )
 
+        request_stage = "EFetch article records"
         fetch_response = requests.get(
             f"{PUBMED_BASE_URL}/efetch.fcgi",
             params={
@@ -2480,6 +2483,22 @@ def search_medical_evidence(
         ET.ParseError,
     ) as exc:
 
+        http_status = (
+            exc.response.status_code
+            if isinstance(exc, requests.HTTPError)
+            and exc.response is not None
+            else None
+        )
+
+        technical_detail = (
+            f"{type(exc).__name__} during {request_stage}"
+        )
+
+        if http_status is not None:
+            technical_detail += f" (HTTP {http_status})"
+
+        print(f"[PUBMED ERROR] {technical_detail}: {exc}")
+
         return json.dumps(
             {
                 "status": "SEARCH_ERROR",
@@ -2490,12 +2509,11 @@ def search_medical_evidence(
                 "results": [],
                 "limitations": [
                     "PubMed could not be reached or its response could not be parsed.",
-                    f"Technical detail: {type(exc).__name__}",
+                    f"Technical detail: {technical_detail}",
                 ],
             },
             ensure_ascii=False,
         )
-
 
 # ============================================================
 # 8. GENERAL MEDICAL RESPONSE INSTRUCTIONS
