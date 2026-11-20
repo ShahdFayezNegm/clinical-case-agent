@@ -2450,7 +2450,16 @@ def search_medical_evidence(
                article_title,
                abstract,
                article_types,
-)
+            )
+            if pmid == "42528679":
+                print(
+                    "[PUBMED DEBUG]",
+                    "file:", __file__,
+                    "PMID:", pmid,
+                    "article_types:", article_types,
+                    "study_design:", study_design,
+                    flush=True,
+                )
 
             score, matched_terms = _relevance_score(
                 topic,
