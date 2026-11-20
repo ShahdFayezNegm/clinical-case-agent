@@ -1499,15 +1499,32 @@ def _extract_study_design(
     text = f"{article_title} {abstract}".lower()
     types = {item.lower() for item in (article_types or [])}
 
-    if "meta-analysis" in types or "meta-analysis" in text:
+    has_meta_analysis = (
+        "meta-analysis" in types
+        or "meta-analysis" in text
+    )
+    has_systematic_review = (
+        "systematic review" in types
+        or "systematic review" in text
+    )
+
+    if has_meta_analysis and has_systematic_review:
+        return "Systematic Review and Meta-Analysis"
+
+    if has_meta_analysis:
         return "Meta-Analysis"
 
-    if "systematic review" in types or "systematic review" in text:
+    if has_systematic_review:
         return "Systematic Review"
+
     if "validation study" in types:
         return "Validation Study"
 
-    if re.search(r"\brandomi[sz]ed controlled trial\b|\brandomi[sz]ed clinical trial\b", text):
+    if re.search(
+        r"\brandomi[sz]ed controlled trial\b"
+        r"|\brandomi[sz]ed clinical trial\b",
+        text,
+    ):
         return "Randomized Controlled Trial"
 
     if re.search(r"\bcross-sectional\b", text):
@@ -1516,15 +1533,39 @@ def _extract_study_design(
     if re.search(r"\bcase-control\b", text):
         return "Case-Control Study"
 
-    if re.search(r"\bcohort study\b|\bcohort studies\b|\bprospective cohort\b|\bretrospective cohort\b", text):
+    if re.search(
+        r"\bprospective\s+observational\s+study\b",
+        text,
+    ):
+        return "Prospective Observational Study"
+
+    if "observational study" in types or re.search(
+        r"\bobservational study\b",
+        text,
+    ):
+        return "Observational Study"
+
+    if re.search(
+        r"\bcohort study\b"
+        r"|\bcohort studies\b"
+        r"|\bprospective cohort\b"
+        r"|\bretrospective cohort\b",
+        text,
+    ):
         return "Cohort Study"
 
     if re.search(r"\bcase report\b|\bcase series\b", text):
         return "Case Report/Series"
 
-    if "review" in types or re.search(r"\breview\b", text):
-        return "Review"
+    if re.search(
+        r"\bdevelopment and evaluation\b"
+        r"|\bdeveloped and evaluated\b",
+        text,
+    ):
+        return "Development and Evaluation Study"
 
+    if "review" in types or re.search(r"\breview\b", text):
+     return "Review"
     return "Not specified"
 
 

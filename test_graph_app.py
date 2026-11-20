@@ -1900,3 +1900,39 @@ def test_select_diverse_articles_fallback_does_not_add_weak_articles():
         "Highly relevant article",
         "Relevant article",
     ]
+
+
+def test_extract_study_design_identifies_systematic_review_and_meta_analysis():
+    from graph_app import _extract_study_design
+
+    result = _extract_study_design(
+        "Deep learning algorithms for detection of diabetic retinopathy",
+        "We performed a systematic review and meta-analysis.",
+        ["Journal Article", "Systematic Review", "Meta-Analysis"],
+    )
+
+    assert result == "Systematic Review and Meta-Analysis"
+
+
+def test_extract_study_design_identifies_development_and_evaluation():
+    from graph_app import _extract_study_design
+
+    result = _extract_study_design(
+        "Deep learning-based analysis of infrared fundus photography",
+        "We developed and evaluated an AI diagnostic method.",
+        ["Journal Article"],
+    )
+
+    assert result == "Development and Evaluation Study"
+
+
+def test_extract_study_design_identifies_prospective_observational_study():
+    from graph_app import _extract_study_design
+
+    result = _extract_study_design(
+        "Efficacy of deep learning-based artificial intelligence models",
+        "This was a prospective observational study.",
+        ["Journal Article", "Observational Study"],
+    )
+
+    assert result == "Prospective Observational Study"
