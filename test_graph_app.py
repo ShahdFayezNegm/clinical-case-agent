@@ -1654,6 +1654,37 @@ def test_iron_queries_are_preserved():
     assert any("transferrin saturation" in q for q in queries)
 
 
+def test_iron_queries_cover_diagnostic_accuracy_when_requested():
+    queries = _build_pubmed_queries(
+        "iron deficiency anemia",
+        original_question=(
+            "Find recent systematic reviews and meta-analyses "
+            "on diagnostic accuracy of available tests for "
+            "iron deficiency anemia."
+        ),
+    )
+
+    combined_queries = " ".join(queries).lower()
+
+    assert "diagnostic accuracy" in combined_queries
+    assert "sensitivity" in combined_queries
+    assert "specificity" in combined_queries
+    assert "systematic review" in combined_queries
+    assert "meta-analysis" in combined_queries
+
+
+def test_general_iron_queries_do_not_add_diagnostic_accuracy_queries():
+    queries = _build_pubmed_queries(
+        "iron deficiency anemia"
+    )
+
+    combined_queries = " ".join(queries).lower()
+
+    assert "diagnostic accuracy" not in combined_queries
+    assert "sensitivity" not in combined_queries
+    assert "specificity" not in combined_queries
+
+
 def test_b12_queries_are_preserved():
     queries = _build_pubmed_queries(
         "vitamin B12 deficiency and methylmalonic acid"

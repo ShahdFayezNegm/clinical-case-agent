@@ -1,4 +1,4 @@
-import json
+﻿import json
 import os
 import re
 import uuid
@@ -1984,10 +1984,22 @@ def _age_relevance_score(
 def _build_pubmed_queries(
     topic: str,
     patient_pregnancy_status: str = "unknown",
+    original_question: str | None = None,
 ) -> list[str]:
     """Build focused PubMed queries for supported medical research topics."""
 
     topic_lower = topic.lower()
+    question_lower = (original_question or topic).lower()
+
+    requests_diagnostic_accuracy = any(
+        term in question_lower
+        for term in (
+            "diagnostic accuracy",
+            "sensitivity",
+            "specificity",
+            "diagnostic performance",
+        )
+    )
     queries = []
 
     has_iron_evidence = any(
@@ -2029,11 +2041,20 @@ def _build_pubmed_queries(
             "diabetic retinopathy AND deep learning AND sensitivity AND specificity",
             "diabetic retinopathy AND deep learning AND systematic review",
         ])
+
     if has_iron_evidence:
         queries.extend([
             "iron deficiency anemia AND ferritin",
             "iron deficiency anemia AND transferrin saturation",
         ])
+
+        if requests_diagnostic_accuracy:
+            queries.extend([
+                "iron deficiency anemia AND diagnostic accuracy AND ferritin",
+                "iron deficiency anemia AND sensitivity AND specificity",
+                "iron deficiency anemia AND diagnostic tests AND systematic review",
+                "iron deficiency anemia AND diagnostic accuracy AND meta-analysis",
+            ])
 
     if has_b12_evidence:
         queries.extend([
@@ -2289,12 +2310,12 @@ def search_medical_evidence(
     request_stage = "Preparing PubMed search"
 
     try:
-               # Build multiple focused queries, or fall back to the original topic.
+# Build multiple focused queries, or fall back to the original topic.
         search_queries = _build_pubmed_queries(
-        
-    topic,
-    patient_pregnancy_status=patient_pregnancy_status,
-) or [topic]
+            topic,
+            patient_pregnancy_status=patient_pregnancy_status,
+            original_question=context_question,
+        ) or [topic]
         date_filter = _extract_pubmed_date_range(
             context_question
         )

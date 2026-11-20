@@ -247,10 +247,10 @@ def test_search_medical_evidence_rejects_long_query():
     assert result["status"] == "INVALID_QUERY"
     assert result["results"] == []
 
-
 # =========================================================
 # PubMed error handling tests
 # =========================================================
+
 
 @patch("graph_app.requests.get")
 def test_search_medical_evidence_handles_connection_error(mock_get):
@@ -518,6 +518,54 @@ def test_search_medical_evidence_preserves_original_question_constraints(
         == "Adolescent"
     )
     assert returned_article["age_relevance_score"] == 3
+
+
+@patch("graph_app.requests.get")
+def test_search_medical_evidence_sends_diagnostic_accuracy_queries_for_iron(
+    mock_get,
+):
+    esearch_params = []
+
+    def mock_pubmed_request(url, *args, **kwargs):
+        if "esearch.fcgi" in url:
+            esearch_params.append(kwargs["params"])
+            return make_response(
+                make_esearch_response([])
+            )
+
+        raise AssertionError(f"Unexpected PubMed URL: {url}")
+
+    mock_get.side_effect = mock_pubmed_request
+
+    original_question = (
+        "A 55-year-old male with fatigue, weight loss, and "
+        "iron-deficiency anemia. Find recent systematic reviews "
+        "and meta-analyses on diagnostic accuracy of available "
+        "tests for iron deficiency anemia."
+    )
+
+    result = json.loads(
+        search_medical_evidence.invoke({
+            "query": "iron deficiency anemia",
+            "patient_age": 55,
+            "original_question": original_question,
+        })
+    )
+
+    sent_terms = [
+        params["term"].lower()
+        for params in esearch_params
+    ]
+    combined_terms = " ".join(sent_terms)
+
+    assert result["status"] == "NO_RESULTS"
+    assert sent_terms
+    assert "diagnostic accuracy" in combined_terms
+    assert "sensitivity" in combined_terms
+    assert "specificity" in combined_terms
+    assert "systematic review" in combined_terms
+    assert "meta-analysis" in combined_terms
+
 
 # =========================================================
 # Invalid XML handling
