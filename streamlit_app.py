@@ -608,7 +608,27 @@ if st.session_state.last_answer:
                 "This does not prove that relevant medical evidence "
                 "does not exist. Try refining the search query."
             )
+            query_diagnostics = data.get(
+                "query_diagnostics", []
+            )
 
+            if query_diagnostics:
+                with st.expander(
+                    "PubMed Diagnostic Details"
+                ):
+                    for index, diagnostic in enumerate(
+                        query_diagnostics, start=1
+                    ):
+                        st.markdown(f"**Query {index}**")
+                        st.write(
+                            f"Search: {diagnostic.get('query', 'N/A')}"
+                        )
+                        st.write(
+                            f"HTTP Status: {diagnostic.get('http_status', 'N/A')}"
+                        )
+                        st.write(
+                            f"PMIDs returned: {diagnostic.get('pmid_count', 'N/A')}"
+                        )
         elif status != "SUCCESS":
 
             st.warning(

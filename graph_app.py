@@ -2258,6 +2258,7 @@ def search_medical_evidence(
 
         all_ids = []
         query_matches = {}
+        query_diagnostics = []
 
         print(
             f"[PUBMED DEBUG] Number of queries: {len(search_queries)}"
@@ -2289,7 +2290,13 @@ def search_medical_evidence(
             ids_for_query = search_data.get(
                 "esearchresult", {}
             ).get("idlist", [])
-
+            query_diagnostics.append(
+                {
+                    "query": search_query,
+                    "http_status": search_response.status_code,
+                    "pmid_count": len(ids_for_query),
+                }
+            )
             print(
                 f"[PUBMED DEBUG] Query {query_index}: "
                 f"{len(ids_for_query)} PMID(s)"
