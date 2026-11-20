@@ -1832,7 +1832,7 @@ def _age_relevance_score(
         }
 
         adult_only_patterns = (
-            r"\baged\s*[≥>=]+\s*18\s*years?\b",
+            r"\baged\s*[â‰¥>=]+\s*18\s*years?\b",
             r"\baged\s+18\s+years?\s+or\s+older\b",
             r"\b18\s+years?\s+and\s+older\b",
             r"\b18\s+years?\s+or\s+older\b",
@@ -2304,7 +2304,7 @@ def search_medical_evidence(
         query_diagnostics = []
 
         print(
-            f"[PUBMED DEBUG] Number of queries: {len(search_queries)}"
+            f"[PUBMED] Number of queries: {len(search_queries)}"
         )
 
         for query_index, search_query in enumerate(search_queries, start=1):
@@ -2336,14 +2336,14 @@ def search_medical_evidence(
 
                     wait_seconds = max(0, min(wait_seconds, 30))
                     print(
-                        f"[PUBMED DEBUG] Query {query_index}: "
+                        f"[PUBMED] Query {query_index}: "
                         f"HTTP 429, retrying in {wait_seconds}s "
                         f"(attempt {attempt + 1}/3)"
                     )
                     time.sleep(wait_seconds)
 
             print(
-                f"[PUBMED DEBUG] Query {query_index}: "
+                f"[PUBMED] Query {query_index}: "
                 f"HTTP {search_response.status_code}"
             )
 
@@ -2361,7 +2361,7 @@ def search_medical_evidence(
                 }
             )
             print(
-                f"[PUBMED DEBUG] Query {query_index}: "
+                f"[PUBMED] Query {query_index}: "
                 f"{len(ids_for_query)} PMID(s)"
             )
 
@@ -2373,7 +2373,7 @@ def search_medical_evidence(
                 query_matches[pmid].append(search_query)
 
         print(
-            f"[PUBMED DEBUG] Total unique PMIDs: {len(all_ids)}"
+            f"[PUBMED] Total unique PMIDs: {len(all_ids)}"
         )
         ids = all_ids
         if not ids:
@@ -2397,16 +2397,49 @@ def search_medical_evidence(
                 ensure_ascii=False,
             )
 
+
         request_stage = "EFetch article records"
-        fetch_response = requests.get(
-            f"{PUBMED_BASE_URL}/efetch.fcgi",
-            params={
-                "db": "pubmed",
-                "id": ",".join(ids),
-                "retmode": "xml",
-            },
-            headers=headers,
-            timeout=20,
+
+        for attempt in range(3):
+            fetch_response = requests.get(
+                f"{PUBMED_BASE_URL}/efetch.fcgi",
+                params={
+                    "db": "pubmed",
+                    "id": ",".join(ids),
+                    "retmode": "xml",
+                },
+                headers=headers,
+                timeout=20,
+            )
+
+            if fetch_response.status_code != 429:
+                break
+
+            if attempt < 2:
+                retry_after = fetch_response.headers.get(
+                    "Retry-After"
+                )
+
+                try:
+                    wait_seconds = float(retry_after)
+                except (TypeError, ValueError):
+                    wait_seconds = 2 ** attempt
+
+                wait_seconds = max(0, min(wait_seconds, 30))
+
+                print(
+                    f"[PUBMED] EFetch HTTP 429, "
+                    f"retrying in {wait_seconds}s "
+                    f"(attempt {attempt + 1}/3)",
+                    flush=True,
+                )
+
+                time.sleep(wait_seconds)
+
+        print(
+            f"[PUBMED] EFetch HTTP "
+            f"{fetch_response.status_code}",
+            flush=True,
         )
 
         fetch_response.raise_for_status()
@@ -2451,15 +2484,6 @@ def search_medical_evidence(
                abstract,
                article_types,
             )
-            if pmid == "42528679":
-                print(
-                    "[PUBMED DEBUG]",
-                    "file:", __file__,
-                    "PMID:", pmid,
-                    "article_types:", article_types,
-                    "study_design:", study_design,
-                    flush=True,
-                )
 
             score, matched_terms = _relevance_score(
                 topic,
@@ -3135,7 +3159,7 @@ def main() -> None:
     print("=" * 65)
     print(f"Model: {MODEL_NAME}")
     print(
-        "Educational prototype — not for clinical decision-making."
+        "Educational prototype â€” not for clinical decision-making."
     )
     print()
 

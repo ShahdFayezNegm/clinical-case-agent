@@ -777,3 +777,86 @@ def test_search_medical_evidence_stops_after_three_http_429_responses(
     assert result["results"] == []
     assert mock_get.call_count == 3
     assert mock_sleep.call_count == 2
+
+@patch("graph_app.requests.get")
+@patch("graph_app.time.sleep")
+def test_efetch_retries_after_http_429(
+    mock_sleep,
+    mock_get,
+):
+    article = make_pubmed_article(
+        "101",
+        "Aspirin and bleeding risk",
+        "This study investigates aspirin use and bleeding risk.",
+    )
+
+    esearch_response = make_response(
+        make_esearch_response(["101"])
+    )
+
+    rate_limited_response = make_response(status_code=429)
+    rate_limited_response.headers = {"Retry-After": "0"}
+
+    efetch_success_response = make_response(
+        text=make_pubmed_xml(article)
+    )
+
+    efetch_attempts = {"count": 0}
+
+    def mock_pubmed_request(url, *args, **kwargs):
+        if "esearch.fcgi" in url:
+            return esearch_response
+
+        if "efetch.fcgi" in url:
+            efetch_attempts["count"] += 1
+
+            if efetch_attempts["count"] == 1:
+                return rate_limited_response
+
+            return efetch_success_response
+
+        raise AssertionError(f"Unexpected URL: {url}")
+
+    mock_get.side_effect = mock_pubmed_request
+
+    result = invoke_search("aspirin bleeding risk")
+
+    assert result["status"] == "SUCCESS"
+    assert result["result_count"] == 1
+    assert efetch_attempts["count"] == 2
+    mock_sleep.assert_called_once_with(0.0)
+
+
+@patch("graph_app.requests.get")
+@patch("graph_app.time.sleep")
+def test_efetch_stops_after_three_http_429_responses(
+    mock_sleep,
+    mock_get,
+):
+    esearch_response = make_response(
+        make_esearch_response(["101"])
+    )
+
+    rate_limited_response = make_response(status_code=429)
+    rate_limited_response.headers = {"Retry-After": "0"}
+    rate_limited_response.raise_for_status.side_effect = (
+        requests.HTTPError("429 Too Many Requests")
+    )
+
+    def mock_pubmed_request(url, *args, **kwargs):
+        if "esearch.fcgi" in url:
+            return esearch_response
+
+        if "efetch.fcgi" in url:
+            return rate_limited_response
+
+        raise AssertionError(f"Unexpected URL: {url}")
+
+    mock_get.side_effect = mock_pubmed_request
+
+    result = invoke_search("aspirin bleeding risk")
+
+    assert result["status"] == "SEARCH_ERROR"
+    assert result["results"] == []
+    assert mock_get.call_count == 4
+    assert mock_sleep.call_count == 2

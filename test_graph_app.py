@@ -1730,7 +1730,31 @@ def test_extract_article_types_returns_review():
         "Review",
         "Systematic Review",
     ]
+def test_extract_article_types_identifies_systematic_review_and_meta_analysis():
+    import xml.etree.ElementTree as ET
+    from graph_app import _extract_study_design
 
+    article = ET.fromstring("""
+    <PubmedArticle>
+        <PublicationTypeList>
+            <PublicationType>Journal Article</PublicationType>
+            <PublicationType>Systematic Review</PublicationType>
+            <PublicationType>Meta-Analysis</PublicationType>
+        </PublicationTypeList>
+    </PubmedArticle>
+    """)
+
+    article_types = _extract_article_types(article)
+
+    result = _extract_study_design(
+        "Deep learning algorithms for detection of diabetic retinopathy",
+        "We performed a systematic review and meta-analysis.",
+        article_types,
+    )
+
+    assert "Systematic Review" in article_types
+    assert "Meta-Analysis" in article_types
+    assert result == "Systematic Review and Meta-Analysis"
 
 def test_extract_article_types_returns_journal_article():
     import xml.etree.ElementTree as ET
