@@ -271,7 +271,12 @@ def test_search_medical_evidence_handles_no_results(mock_get):
     )
 
     result = invoke_search("unknown medical topic")
-
+    assert result["candidate_count"] == 0
+    assert len(result["query_diagnostics"]) == len(result["search_queries"])
+    assert all(
+        item["http_status"] == 200 and item["pmid_count"] == 0
+        for item in result["query_diagnostics"]
+    )
     assert result["status"] == "NO_RESULTS"
     assert result["results"] == []
     assert result["result_count"] == 0
@@ -665,3 +670,44 @@ def test_extract_pubmed_topic_removes_published_studies_prefix():
     assert "retinal fundus images" in result.lower()
     assert "published clinical studies" not in result.lower()
     assert "systematic reviews reporting" not in result.lower()
+@patch("graph_app._select_diverse_articles", return_value=[])
+@patch("graph_app.requests.get")
+def test_search_medical_evidence_includes_diagnostics_when_no_articles_are_selected(
+    mock_get,
+    mock_select,
+):
+    article = make_pubmed_article(
+        "101",
+        "Aspirin and bleeding risk",
+        "This study investigates aspirin use and bleeding risk.",
+    )
+
+    def mock_pubmed_request(url, *args, **kwargs):
+        if "esearch.fcgi" in url:
+            return make_response(
+                make_esearch_response(["101"])
+            )
+
+        if "efetch.fcgi" in url:
+            return make_response(
+                text=make_pubmed_xml(article)
+            )
+
+        raise AssertionError(f"Unexpected PubMed URL: {url}")
+
+    mock_get.side_effect = mock_pubmed_request
+
+    result = invoke_search("aspirin bleeding risk")
+
+    assert result["status"] == "NO_RESULTS"
+    assert result["candidate_count"] == 1
+    assert result["result_count"] == 0
+    assert result["results"] == []
+    assert len(result["query_diagnostics"]) == len(
+        result["search_queries"]
+    )
+    assert all(
+        item["http_status"] == 200
+        and item["pmid_count"] == 1
+        for item in result["query_diagnostics"]
+    )

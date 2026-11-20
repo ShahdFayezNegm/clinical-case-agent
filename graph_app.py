@@ -2316,6 +2316,9 @@ def search_medical_evidence(
         if not ids:
             return json.dumps(
                 {
+                    "candidate_count": 0,
+                    "search_queries": search_queries,
+                    "query_diagnostics": query_diagnostics,
                     "status": "NO_RESULTS",
                     "query": query,
                     "search_query": topic,
@@ -2450,6 +2453,8 @@ def search_medical_evidence(
         ]
         return json.dumps(
             {
+                "query_diagnostics": query_diagnostics,
+                "search_queries": search_queries,
                 "status": "SUCCESS" if results else "NO_RESULTS",
                 "query": query,
                 "search_query": topic,
