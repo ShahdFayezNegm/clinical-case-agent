@@ -2677,6 +2677,8 @@ def extract_clinical_research_topic(question: str) -> str:
         return topics[0]
 
     return extract_pubmed_topic(question)
+
+
 def is_evidence_question(question: str) -> bool:
     """Identify explicit requests for published medical evidence."""
 
@@ -2684,7 +2686,14 @@ def is_evidence_question(question: str) -> bool:
         r"\b("
         r"medical evidence|scientific evidence|"
         r"research|clinical studies|pubmed|medical literature|"
-        r"clinical evidence|published studies"
+        r"clinical evidence|published studies|"
+        r"systematic reviews?|meta-analyses?|"
+        r"validation studies?|"
+        r"prospective observational studies?|"
+        r"diagnostic accuracy|"
+        r"diagnostic performance|"
+        r"clinical accuracy|"
+        r"deep learning models"
         r")\b"
     )
 
@@ -2695,6 +2704,8 @@ def is_evidence_question(question: str) -> bool:
             re.IGNORECASE,
         )
     )
+
+
 
 
 def agent_node(state: MessagesState) -> dict[str, Any]:

@@ -94,3 +94,18 @@ def test_evidence_request_passes_original_question_to_pubmed():
     assert args["original_question"] == question
     assert args["patient_age"] is None
     assert "query" in args
+
+
+def test_diagnostic_accuracy_research_question_uses_pubmed():
+    question = (
+        "Evaluate the diagnostic accuracy of deep learning models "
+        "for detecting diabetic retinopathy from retinal fundus images. "
+        "Compare sensitivity, specificity, AUC, and accuracy across "
+        "different datasets, and identify systematic reviews, "
+        "meta-analyses, validation studies, and prospective "
+        "observational studies."
+    )
+
+    tool_name = get_tool_name(question)
+
+    assert tool_name == "search_medical_evidence"
