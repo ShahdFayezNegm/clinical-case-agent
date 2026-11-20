@@ -723,6 +723,20 @@ def test_study_population_relevance_identifies_adults():
     )
 
     assert result == "Adult"
+
+def test_study_population_review_identifies_elderly_and_children_as_mixed():
+    result = _study_population_relevance(
+        ["Child"],
+        "",
+        article_title="Vitamin B12 deficiency",
+        abstract=(
+            "Vitamin B12 deficiency occurs across all age groups, "
+            "especially elderly people and children."
+        ),
+        article_types=["Review"],
+    )
+
+    assert result == "Mixed"
 def test_study_population_relevance_without_target_population():
     result = _study_population_relevance(
         [],

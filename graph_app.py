@@ -1639,6 +1639,11 @@ def _study_population_relevance(
             or re.search(r"\bnonpregnant adults?\b", population_text)
             or re.search(r"\bover 18 years\b", population_text)
             or re.search(r"\b18 years and older\b", population_text)
+            or re.search(
+                r"\b(?:elderly|geriatric)\b"
+                r"|\bolder\s+(?:adults?|people|patients|individuals|persons)\b",
+                population_text,
+            )
         )
 
         has_adolescent_text = bool(
@@ -1687,6 +1692,8 @@ def _study_population_relevance(
         r"\badult population\b",
         r"\baged 18 years and above\b",
         r"\b18 years and older\b",
+        r"\b(?:elderly|geriatric)\b",
+        r"\bolder\s+(?:adults?|people|patients|individuals|persons)\b",
     ]
 
     adolescent_patterns = [
