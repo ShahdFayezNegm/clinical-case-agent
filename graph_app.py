@@ -2259,19 +2259,28 @@ def search_medical_evidence(
         all_ids = []
         query_matches = {}
 
-        for search_query in search_queries:
+        print(
+            f"[PUBMED DEBUG] Number of queries: {len(search_queries)}"
+        )
+
+        for query_index, search_query in enumerate(search_queries, start=1):
             search_response = requests.get(
                 f"{PUBMED_BASE_URL}/esearch.fcgi",
                 params={
-                  "db": "pubmed",
-                  "term": search_query,
-                  "retmax": 20,
-                 "retmode": "json",
-                 "sort": "relevance",
-                 **(date_filter or {}),
+                    "db": "pubmed",
+                    "term": search_query,
+                    "retmax": 20,
+                    "retmode": "json",
+                    "sort": "relevance",
+                    **(date_filter or {}),
                 },
                 headers=headers,
                 timeout=15,
+            )
+
+            print(
+                f"[PUBMED DEBUG] Query {query_index}: "
+                f"HTTP {search_response.status_code}"
             )
 
             search_response.raise_for_status()
@@ -2281,6 +2290,11 @@ def search_medical_evidence(
                 "esearchresult", {}
             ).get("idlist", [])
 
+            print(
+                f"[PUBMED DEBUG] Query {query_index}: "
+                f"{len(ids_for_query)} PMID(s)"
+            )
+
             for pmid in ids_for_query:
                 if pmid not in query_matches:
                     all_ids.append(pmid)
@@ -2288,6 +2302,9 @@ def search_medical_evidence(
 
                 query_matches[pmid].append(search_query)
 
+        print(
+            f"[PUBMED DEBUG] Total unique PMIDs: {len(all_ids)}"
+        )
         ids = all_ids
         if not ids:
             return json.dumps(
