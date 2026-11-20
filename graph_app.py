@@ -2,6 +2,7 @@ import json
 import os
 import re
 import uuid
+import time
 import requests
 import xml.etree.ElementTree as ET
 from datetime import date
@@ -2267,19 +2268,38 @@ def search_medical_evidence(
 
         for query_index, search_query in enumerate(search_queries, start=1):
             request_stage = f"ESearch query {query_index}"
-            search_response = requests.get(
-                f"{PUBMED_BASE_URL}/esearch.fcgi",
-                params={
-                    "db": "pubmed",
-                    "term": search_query,
-                    "retmax": 20,
-                    "retmode": "json",
-                    "sort": "relevance",
-                    **(date_filter or {}),
-                },
-                headers=headers,
-                timeout=15,
-            )
+            for attempt in range(3):
+                search_response = requests.get(
+                    f"{PUBMED_BASE_URL}/esearch.fcgi",
+                    params={
+                        "db": "pubmed",
+                        "term": search_query,
+                        "retmax": 20,
+                        "retmode": "json",
+                        "sort": "relevance",
+                        **(date_filter or {}),
+                    },
+                    headers=headers,
+                    timeout=15,
+                )
+
+                if search_response.status_code != 429:
+                    break
+
+                if attempt < 2:
+                    retry_after = search_response.headers.get("Retry-After")
+                    try:
+                        wait_seconds = float(retry_after)
+                    except (TypeError, ValueError):
+                        wait_seconds = 2 ** attempt
+
+                    wait_seconds = max(0, min(wait_seconds, 30))
+                    print(
+                        f"[PUBMED DEBUG] Query {query_index}: "
+                        f"HTTP 429, retrying in {wait_seconds}s "
+                        f"(attempt {attempt + 1}/3)"
+                    )
+                    time.sleep(wait_seconds)
 
             print(
                 f"[PUBMED DEBUG] Query {query_index}: "

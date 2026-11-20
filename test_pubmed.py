@@ -711,3 +711,69 @@ def test_search_medical_evidence_includes_diagnostics_when_no_articles_are_selec
         and item["pmid_count"] == 1
         for item in result["query_diagnostics"]
     )
+
+
+@patch("graph_app.requests.get")
+@patch("graph_app.time.sleep")
+def test_search_medical_evidence_retries_after_http_429(
+    mock_sleep,
+    mock_get,
+):
+    article = make_pubmed_article(
+        "101",
+        "Aspirin and bleeding risk",
+        "This study investigates aspirin use and bleeding risk.",
+    )
+
+    rate_limited_response = make_response(status_code=429)
+    rate_limited_response.headers = {"Retry-After": "0"}
+
+    esearch_response = make_response(
+        make_esearch_response(["101"])
+    )
+    efetch_response = make_response(
+        text=make_pubmed_xml(article)
+    )
+
+    esearch_attempts = {"count": 0}
+
+    def mock_pubmed_request(url, *args, **kwargs):
+        if "esearch.fcgi" in url:
+            esearch_attempts["count"] += 1
+
+            if esearch_attempts["count"] == 1:
+                return rate_limited_response
+
+            return esearch_response
+
+        return efetch_response
+
+    mock_get.side_effect = mock_pubmed_request
+
+    result = invoke_search("aspirin bleeding risk")
+
+    assert result["status"] == "SUCCESS"
+    assert esearch_attempts["count"] >= 2
+    mock_sleep.assert_called_once_with(0.0)
+
+
+@patch("graph_app.requests.get")
+@patch("graph_app.time.sleep")
+def test_search_medical_evidence_stops_after_three_http_429_responses(
+    mock_sleep,
+    mock_get,
+):
+    rate_limited_response = make_response(status_code=429)
+    rate_limited_response.headers = {"Retry-After": "0"}
+    rate_limited_response.raise_for_status.side_effect = (
+        requests.HTTPError("429 Too Many Requests")
+    )
+
+    mock_get.return_value = rate_limited_response
+
+    result = invoke_search("aspirin bleeding risk")
+
+    assert result["status"] == "SEARCH_ERROR"
+    assert result["results"] == []
+    assert mock_get.call_count == 3
+    assert mock_sleep.call_count == 2
