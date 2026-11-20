@@ -2353,9 +2353,8 @@ def search_medical_evidence(
                     try:
                         wait_seconds = float(retry_after)
                     except (TypeError, ValueError):
-                        wait_seconds = 2 ** attempt
-
-                    wait_seconds = max(0, min(wait_seconds, 30))
+                        wait_seconds = 5 * (2 ** attempt)
+                    wait_seconds = max(0, min(wait_seconds, 60))
                     print(
                         f"[PUBMED] Query {query_index}: "
                         f"HTTP 429, retrying in {wait_seconds}s "
@@ -2444,10 +2443,8 @@ def search_medical_evidence(
                 try:
                     wait_seconds = float(retry_after)
                 except (TypeError, ValueError):
-                    wait_seconds = 2 ** attempt
-
-                wait_seconds = max(0, min(wait_seconds, 30))
-
+                    wait_seconds = 5 * (2 ** attempt)
+                wait_seconds = max(0, min(wait_seconds, 60))
                 print(
                     f"[PUBMED] EFetch HTTP 429, "
                     f"retrying in {wait_seconds}s "

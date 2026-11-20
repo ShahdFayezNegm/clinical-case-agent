@@ -804,7 +804,77 @@ def test_search_medical_evidence_retries_after_http_429(
     assert esearch_attempts["count"] >= 2
     mock_sleep.assert_called_once_with(0.0)
 
+@patch("graph_app.requests.get")
+@patch("graph_app.time.sleep")
+def test_esearch_uses_exponential_backoff_without_retry_after(
+    mock_sleep,
+    mock_get,
+):
+    article = make_pubmed_article(
+        "101",
+        "Aspirin and bleeding risk",
+        "This study investigates aspirin use and bleeding risk.",
+    )
 
+    rate_limited_response = make_response(status_code=429)
+
+    esearch_response = make_response(
+        make_esearch_response(["101"])
+    )
+
+    efetch_response = make_response(
+        text=make_pubmed_xml(article)
+    )
+
+    esearch_attempts = {"count": 0}
+@patch("graph_app.requests.get")
+@patch("graph_app.time.sleep")
+def test_esearch_uses_exponential_backoff_for_two_retries(
+    mock_sleep,
+    mock_get,
+):
+    article = make_pubmed_article(
+        "101",
+        "Aspirin and bleeding risk",
+        "This study investigates aspirin use and bleeding risk.",
+    )
+
+    rate_limited_response = make_response(status_code=429)
+
+    esearch_response = make_response(
+        make_esearch_response(["101"])
+    )
+
+    efetch_response = make_response(
+        text=make_pubmed_xml(article)
+    )
+
+    esearch_attempts = {"count": 0}
+
+    def mock_pubmed_request(url, *args, **kwargs):
+        if "esearch.fcgi" in url:
+            esearch_attempts["count"] += 1
+
+            if esearch_attempts["count"] <= 2:
+                return rate_limited_response
+
+            return esearch_response
+
+        if "efetch.fcgi" in url:
+            return efetch_response
+
+        raise AssertionError(f"Unexpected PubMed URL: {url}")
+
+    mock_get.side_effect = mock_pubmed_request
+
+    result = invoke_search("aspirin bleeding risk")
+
+    assert result["status"] == "SUCCESS"
+    assert esearch_attempts["count"] == 3
+    assert [call.args[0] for call in mock_sleep.call_args_list] == [
+        5,
+        10,
+    ]
 @patch("graph_app.requests.get")
 @patch("graph_app.time.sleep")
 def test_search_medical_evidence_stops_after_three_http_429_responses(
@@ -873,8 +943,99 @@ def test_efetch_retries_after_http_429(
     assert result["result_count"] == 1
     assert efetch_attempts["count"] == 2
     mock_sleep.assert_called_once_with(0.0)
+@patch("graph_app.requests.get")
+@patch("graph_app.time.sleep")
+def test_efetch_uses_exponential_backoff_without_retry_after(
+    mock_sleep,
+    mock_get,
+):
+    article = make_pubmed_article(
+        "101",
+        "Aspirin and bleeding risk",
+        "This study investigates aspirin use and bleeding risk.",
+    )
 
+    esearch_response = make_response(
+        make_esearch_response(["101"])
+    )
 
+    rate_limited_response = make_response(status_code=429)
+
+    efetch_success_response = make_response(
+        text=make_pubmed_xml(article)
+    )
+
+    efetch_attempts = {"count": 0}
+
+    def mock_pubmed_request(url, *args, **kwargs):
+        if "esearch.fcgi" in url:
+            return esearch_response
+
+        if "efetch.fcgi" in url:
+            efetch_attempts["count"] += 1
+
+            if efetch_attempts["count"] == 1:
+                return rate_limited_response
+
+            return efetch_success_response
+
+        raise AssertionError(f"Unexpected PubMed URL: {url}")
+
+    mock_get.side_effect = mock_pubmed_request
+
+    result = invoke_search("aspirin bleeding risk")
+
+    assert result["status"] == "SUCCESS"
+    assert efetch_attempts["count"] == 2
+    mock_sleep.assert_called_once_with(5)
+@patch("graph_app.requests.get")
+@patch("graph_app.time.sleep")
+def test_efetch_uses_exponential_backoff_for_two_retries(
+    mock_sleep,
+    mock_get,
+):
+    article = make_pubmed_article(
+        "101",
+        "Aspirin and bleeding risk",
+        "This study investigates aspirin use and bleeding risk.",
+    )
+
+    esearch_response = make_response(
+        make_esearch_response(["101"])
+    )
+
+    rate_limited_response = make_response(status_code=429)
+
+    efetch_success_response = make_response(
+        text=make_pubmed_xml(article)
+    )
+
+    efetch_attempts = {"count": 0}
+
+    def mock_pubmed_request(url, *args, **kwargs):
+        if "esearch.fcgi" in url:
+            return esearch_response
+
+        if "efetch.fcgi" in url:
+            efetch_attempts["count"] += 1
+
+            if efetch_attempts["count"] <= 2:
+                return rate_limited_response
+
+            return efetch_success_response
+
+        raise AssertionError(f"Unexpected PubMed URL: {url}")
+
+    mock_get.side_effect = mock_pubmed_request
+
+    result = invoke_search("aspirin bleeding risk")
+
+    assert result["status"] == "SUCCESS"
+    assert efetch_attempts["count"] == 3
+    assert [call.args[0] for call in mock_sleep.call_args_list] == [
+        5,
+        10,
+    ]
 @patch("graph_app.requests.get")
 @patch("graph_app.time.sleep")
 def test_efetch_stops_after_three_http_429_responses(
