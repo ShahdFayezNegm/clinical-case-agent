@@ -2119,3 +2119,23 @@ def test_age_relevance_scores_mixed_population_for_middle_aged_patient():
     )
 
     assert score == 1
+def test_age_relevance_scores_adult_only_for_middle_aged_patient():
+    score = _age_relevance_score(
+        55,
+        [],
+        article_title="Iron deficiency anemia in adults",
+        abstract="This review discusses iron deficiency in adult men and women.",
+    )
+
+    assert score == 3
+
+
+def test_age_relevance_penalizes_child_only_for_middle_aged_patient():
+    score = _age_relevance_score(
+        55,
+        [],
+        article_title="Iron deficiency anemia in children",
+        abstract="This review discusses iron deficiency in pediatric patients.",
+    )
+
+    assert score == -3
