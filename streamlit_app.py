@@ -140,15 +140,6 @@ st.markdown(
         font-weight: 650;
     }
 
-    .notice {
-        background: #EAF4F6;
-        border-left: 4px solid #258A91;
-        border-radius: 8px;
-        padding: 0.9rem 1rem;
-        color: #315466;
-        font-size: 0.86rem;
-        margin: 1rem 0 1.5rem 0;
-    }
 
     .result-panel {
         background: #FFFFFF;
@@ -331,25 +322,6 @@ with col3:
         """,
         unsafe_allow_html=True,
     )
-
-
-# ==================================================
-# 7. Medical Disclaimer
-# ==================================================
-
-st.markdown(
-    """
-    <div class="notice">
-        <strong>Research prototype notice</strong><br>
-        This system does not provide medical diagnoses or prescribe
-        treatments. All generated information requires review by a
-        qualified healthcare professional. Use fictional or anonymized
-        cases only. Do not enter personally identifiable patient information.
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
 
 # ==================================================
 # 8. Clinical Case Input
