@@ -1686,6 +1686,35 @@ def test_iron_queries_cover_diagnostic_accuracy_when_requested():
     assert "systematic review" in combined_queries
     assert "meta-analysis" in combined_queries
 
+def test_iron_queries_cover_causes_when_requested():
+    queries = _build_pubmed_queries(
+        "iron deficiency anemia",
+        original_question=(
+            "What are the possible underlying causes of "
+            "iron deficiency anemia?"
+        ),
+    )
+
+    combined_queries = " ".join(queries).lower()
+
+    assert "gastrointestinal bleeding" in combined_queries
+    assert "menstrual blood loss" in combined_queries
+    assert "celiac disease" in combined_queries
+    assert "malabsorption" in combined_queries
+def test_iron_queries_cover_further_investigations_when_requested():
+    queries = _build_pubmed_queries(
+        "iron deficiency anemia",
+        original_question=(
+            "What further investigations should be considered "
+            "for a patient with iron deficiency anemia?"
+        ),
+    )
+
+    combined_queries = " ".join(queries).lower()
+
+    assert "diagnostic evaluation" in combined_queries
+    assert "gastrointestinal endoscopy" in combined_queries
+    assert "celiac disease" in combined_queries
 
 def test_general_iron_queries_do_not_add_diagnostic_accuracy_queries():
     queries = _build_pubmed_queries(
@@ -1697,8 +1726,27 @@ def test_general_iron_queries_do_not_add_diagnostic_accuracy_queries():
     assert "diagnostic accuracy" not in combined_queries
     assert "sensitivity" not in combined_queries
     assert "specificity" not in combined_queries
+def test_general_iron_queries_do_not_add_cause_queries():
+    queries = _build_pubmed_queries(
+        "iron deficiency anemia"
+    )
 
+    combined_queries = " ".join(queries).lower()
 
+    assert "gastrointestinal bleeding" not in combined_queries
+    assert "menstrual blood loss" not in combined_queries
+    assert "celiac disease" not in combined_queries
+    assert "etiology" not in combined_queries
+def test_general_iron_queries_do_not_add_investigation_queries():
+    queries = _build_pubmed_queries(
+        "iron deficiency anemia"
+    )
+
+    combined_queries = " ".join(queries).lower()
+
+    assert "diagnostic evaluation" not in combined_queries
+    assert "gastrointestinal endoscopy" not in combined_queries
+    assert "celiac disease and serology" not in combined_queries
 def test_b12_queries_are_preserved():
     queries = _build_pubmed_queries(
         "vitamin B12 deficiency and methylmalonic acid"

@@ -2007,6 +2007,31 @@ def _build_pubmed_queries(
             "diagnostic performance",
         )
     )
+
+    requests_causes = any(
+        term in question_lower
+        for term in (
+            "underlying causes",
+            "possible causes",
+            "causes of",
+            "etiology",
+            "aetiology",
+            "risk factors",
+        )
+    )
+    requests_investigations = any(
+        term in question_lower
+        for term in (
+            "further investigations",
+            "additional investigations",
+            "what investigations",
+            "diagnostic evaluation",
+            "workup",
+            "work-up",
+            "further evaluation",
+        )
+    )
+
     queries = []
 
     has_iron_evidence = any(
@@ -2054,6 +2079,21 @@ def _build_pubmed_queries(
             "iron deficiency anemia AND ferritin",
             "iron deficiency anemia AND transferrin saturation",
         ])
+
+        if requests_causes:
+            queries.extend([
+                "iron deficiency anemia AND gastrointestinal bleeding",
+                "iron deficiency anemia AND menstrual blood loss",
+                "iron deficiency anemia AND celiac disease AND malabsorption",
+                "iron deficiency anemia AND etiology",
+            ])
+
+        if requests_investigations:
+            queries.extend([
+                "iron deficiency anemia AND diagnostic evaluation",
+                "iron deficiency anemia AND gastrointestinal endoscopy",
+                "iron deficiency anemia AND celiac disease AND serology",
+            ])
 
         if requests_diagnostic_accuracy:
             queries.extend([
