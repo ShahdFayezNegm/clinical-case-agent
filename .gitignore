@@ -1,4 +1,4 @@
-﻿venv/
+venv/
 .venv/
 __pycache__/
 .pytest_cache/
@@ -13,3 +13,5 @@ graph_app_llama31_backup.py
 streamlit_app_before_redesign.py
 main.py
 import_times.txt
+
+test_tool_calling.py
