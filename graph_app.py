@@ -1279,6 +1279,7 @@ def _relevance_score(
     topic: str,
     title: str,
     abstract: str,
+    original_question: str | None = None,
 ) -> tuple[int, list[str]]:
     """Score topic relevance using weighted concepts and title/abstract evidence.
 
@@ -1289,7 +1290,35 @@ def _relevance_score(
 
     title_norm = _normalise_for_matching(title)
     abstract_norm = _normalise_for_matching(abstract)
+    question_norm = _normalise_for_matching(
+        original_question or ""
+    )
 
+    requests_causes = any(
+        term in question_norm
+        for term in (
+            "underlying causes",
+            "possible causes",
+            "causes of",
+            "etiology",
+            "aetiology",
+            "risk factors",
+        )
+    )
+
+    requests_investigations = any(
+        term in question_norm
+        for term in (
+            "further investigations",
+            "additional investigations",
+            "what investigations",
+            "diagnostic evaluation",
+            "workup",
+            "work up",
+            "further evaluation",
+            "identify the underlying cause",
+        )
+    )
     concepts = _topic_concepts(topic)
 
     concept_weights = {
@@ -1339,7 +1368,122 @@ def _relevance_score(
         elif abstract_hit:
             score += weight
             matched.append(concept)
+    if requests_causes:
+        cause_groups = (
+            (
+                "cause: gastrointestinal blood loss",
+                (
+                    "gastrointestinal bleeding",
+                    "gastrointestinal blood loss",
+                    "occult gastrointestinal bleeding",
+                    "gi bleeding",
+                ),
+            ),
+            (
+                "cause: menstrual blood loss",
+                (
+                    "menstrual blood loss",
+                    "heavy menstrual bleeding",
+                    "menorrhagia",
+                ),
+            ),
+            (
+                "cause: celiac disease or malabsorption",
+                (
+                    "celiac disease",
+                    "coeliac disease",
+                    "malabsorption",
+                ),
+            ),
+            (
+                "cause: ulcers or h pylori",
+                (
+                    "h pylori",
+                    "helicobacter pylori",
+                    "peptic ulcer",
+                ),
+            ),
+            (
+                "cause: gastrointestinal malignancy",
+                (
+                    "gastrointestinal malignancy",
+                    "colorectal cancer",
+                    "gastric cancer",
+                ),
+            ),
+        )
 
+        for label, terms in cause_groups:
+            title_hit = any(
+                _normalise_for_matching(term) in title_norm
+                for term in terms
+            )
+            abstract_hit = any(
+                _normalise_for_matching(term) in abstract_norm
+                for term in terms
+            )
+
+            if title_hit:
+                score += 8
+                matched.append(label)
+            elif abstract_hit:
+                score += 4
+                matched.append(label)
+
+    if requests_investigations:
+        investigation_groups = (
+            (
+                "investigation: gastrointestinal endoscopy",
+                (
+                    "gastrointestinal endoscopy",
+                    "upper endoscopy",
+                    "upper gastrointestinal endoscopy",
+                    "colonoscopy",
+                    "esophagogastroduodenoscopy",
+                    "oesophagogastroduodenoscopy",
+                ),
+            ),
+            (
+                "investigation: celiac serology",
+                (
+                    "celiac serology",
+                    "coeliac serology",
+                    "tissue transglutaminase",
+                    "anti t t g",
+                ),
+            ),
+            (
+                "investigation: biopsy",
+                (
+                    "duodenal biopsy",
+                    "small bowel biopsy",
+                ),
+            ),
+            (
+                "investigation: urine testing",
+                (
+                    "urinalysis",
+                    "urine testing",
+                ),
+            ),
+        )
+
+        for label, terms in investigation_groups:
+            title_hit = any(
+                _normalise_for_matching(term) in title_norm
+                for term in terms
+            )
+            abstract_hit = any(
+                _normalise_for_matching(term) in abstract_norm
+                for term in terms
+            )
+
+            if title_hit:
+                score += 8
+                matched.append(label)
+            elif abstract_hit:
+                score += 4
+                matched.append(label)
     # Give a modest bonus to the exact distinctive topic phrase.
     meaningful_topic_words = [
         word
@@ -2554,6 +2698,7 @@ def search_medical_evidence(
                 topic,
                 article_title,
                 abstract,
+                original_question=context_question,
             )
             coverage_score, matched_markers = _marker_coverage_score(
                article_title,

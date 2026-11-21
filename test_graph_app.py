@@ -2053,3 +2053,53 @@ def test_extract_study_design_identifies_prospective_observational_study():
     )
 
     assert result == "Prospective Observational Study"
+def test_iron_relevance_rewards_requested_causes():
+    topic = "iron deficiency anemia"
+    question = (
+        "What are the possible underlying causes of "
+        "iron deficiency anemia?"
+    )
+
+    cause_score, cause_matches = _relevance_score(
+        topic,
+        "Causes of iron deficiency anemia: gastrointestinal bleeding "
+        "and celiac disease",
+        "The study investigates gastrointestinal blood loss "
+        "and celiac disease as causes.",
+        original_question=question,
+    )
+
+    unrelated_score, _ = _relevance_score(
+        topic,
+        "Association between iron deficiency anemia and chronic headache",
+        "The study examines headache prevalence.",
+        original_question=question,
+    )
+
+    assert cause_score > unrelated_score
+
+
+def test_iron_relevance_rewards_requested_investigations():
+    topic = "iron deficiency anemia"
+    question = (
+        "What further investigations should be considered "
+        "to identify the underlying cause of iron deficiency anemia?"
+    )
+
+    investigation_score, investigation_matches = _relevance_score(
+        topic,
+        "Diagnostic evaluation of iron deficiency anemia using "
+        "gastrointestinal endoscopy and celiac serology",
+        "The evaluation includes upper endoscopy, colonoscopy, "
+        "celiac serology and biopsy.",
+        original_question=question,
+    )
+
+    unrelated_score, _ = _relevance_score(
+        topic,
+        "Association between iron deficiency anemia and chronic headache",
+        "The study examines headache prevalence.",
+        original_question=question,
+    )
+
+    assert investigation_score > unrelated_score
