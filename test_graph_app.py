@@ -2110,3 +2110,12 @@ def test_iron_relevance_rewards_requested_investigations():
     )
 
     assert investigation_score > unrelated_score
+def test_age_relevance_scores_mixed_population_for_middle_aged_patient():
+    score = _age_relevance_score(
+        55,
+        [],
+        article_title="Iron deficiency anemia in adults and children",
+        abstract="This review discusses iron deficiency in adult men and children.",
+    )
+
+    assert score == 1

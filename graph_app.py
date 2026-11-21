@@ -1972,7 +1972,6 @@ def _age_relevance_score(
 
     elif target_population == "adolescent":
         expected_groups = {"Adolescent"}
-
         mixed_age_groups = {
             "Child",
             "Adult",
@@ -2120,7 +2119,46 @@ def _age_relevance_score(
 
     else:
         return 0
+    if patient_age is not None:
+        population_text = re.sub(
+            r"\badult-onset\b",
+            "",
+            article_text,
+        )
 
+        has_adult_text = bool(
+            re.search(
+                r"\badults?\b|\b(?:elderly|geriatric)\b"
+                r"|\bolder\s+(?:adults?|people|patients|individuals|persons)\b",
+                population_text,
+            )
+        )
+
+        has_child_text = bool(
+            re.search(
+                r"\bchild(?:ren)?\b|\bchildhood\b|\bpediatric\b"
+                r"|\bpaediatric\b|\binfants?\b",
+                article_text,
+            )
+        )
+
+        has_adolescent_text = bool(
+            re.search(
+                r"\badolescents?\b|\bteenagers?\b|\bteenage\b",
+                article_text,
+            )
+        )
+
+        if has_adult_text and (
+            has_child_text or has_adolescent_text
+        ):
+            return 1
+
+        if has_adult_text:
+            return 3
+
+        if has_child_text or has_adolescent_text:
+            return -3
     if expected_groups.intersection(article_age_groups):
         return 3
 
@@ -2128,6 +2166,7 @@ def _age_relevance_score(
         if patient_age is not None and 25 <= patient_age <= 64:
             return 3
         return 0
+
 
     if article_age_groups:
         return -3
