@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 from datetime import date
 from typing import Any
 from itertools import combinations
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage, RemoveMessage, SystemMessage
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, MessagesState, START, END
@@ -19,13 +19,14 @@ from langgraph.prebuilt import ToolNode
 # 1. MODEL CONFIGURATION
 # ============================================================
 
-MODEL_NAME = "meta-llama/llama-3.2-3b-instruct"
+MODEL_NAME = "qwen/qwen3.7-plus"
 
 llm = ChatOpenAI(
     model=MODEL_NAME,
     base_url="https://openrouter.ai/api/v1",
     api_key=os.getenv("OPENROUTER_API_KEY") or "not-configured",
     temperature=0,
+    max_tokens=512,
 )
 
 
@@ -3193,79 +3194,29 @@ def is_evidence_question(question: str) -> bool:
         )
     )
 
-
+llm_with_tools = llm.bind_tools(
+    [
+        check_drug_interactions,
+        search_medical_evidence,
+    ]
+)
 
 
 def agent_node(state: MessagesState) -> dict[str, Any]:
     """
-    Decide whether to search PubMed, use the drug interaction
-    tool, or answer with the OpenRouter language model.
+    Let the language model dynamically decide whether to use tools
+    or answer directly.
     """
 
     messages = state["messages"]
-
     question = get_latest_user_question(messages)
 
     if not question:
         return {
             "messages": [
-                AIMessage(
-                    content="Please enter a question."
-                )
+                AIMessage(content="Please enter a question.")
             ]
         }
-
-    # Priority 1: Explicit medical evidence/research requests.
-    # These requests go to PubMed even if they mention
-    # two or more recognized medications.
-    if is_evidence_question(question):
-        tool_call_message = AIMessage(
-            content="",
-            tool_calls=[
-                {
-                    "name": "search_medical_evidence",
-                                "args": {
-                    "query": extract_clinical_research_topic(question),
-                    "patient_age": _extract_patient_age(question),
-                    "patient_pregnancy_status": _extract_patient_pregnancy_status(question),
-                    "original_question": question,
-                },
-                    "id": str(uuid.uuid4()),
-                    "type": "tool_call",
-                }
-            ],
-        )
-
-        print("[ROUTING] use_tool: search_medical_evidence")
-
-        return {
-            "messages": [tool_call_message]
-        }
-
-    # Priority 2: Medication interaction questions.
-    if is_medication_question(question):
-        tool_call_message = AIMessage(
-            content="",
-            tool_calls=[
-                {
-                    "name": "check_drug_interactions",
-                    "args": {
-                        "question": question
-                    },
-                    "id": str(uuid.uuid4()),
-                    "type": "tool_call",
-                }
-            ],
-        )
-
-        print("[ROUTING] use_tool: check_drug_interactions")
-
-        return {
-            "messages": [tool_call_message]
-        }
-
-    # Priority 3: General questions go to OpenRouter.
-    print("[ROUTING] use_llm")
 
     if not os.getenv("OPENROUTER_API_KEY"):
         return {
@@ -3281,21 +3232,64 @@ def agent_node(state: MessagesState) -> dict[str, Any]:
         }
 
     try:
-        response = llm.invoke(
+        print("[ROUTING] dynamic_agent")
+
+        response = llm_with_tools.invoke(
             [
-                HumanMessage(
-                    content=(
-                        MEDICAL_SYSTEM_INSTRUCTIONS
-                        + "\n\nUser question: "
-                        + question
-                    )
-                )
+                SystemMessage(content=MEDICAL_SYSTEM_INSTRUCTIONS),
+                *messages,
             ]
         )
 
-        return {
-            "messages": [response]
-        }
+        if not response.tool_calls:
+            return {"messages": [response]}
+
+        normalized_tool_calls = []
+
+        for tool_call in response.tool_calls:
+            name = tool_call["name"]
+            args = dict(tool_call.get("args") or {})
+
+            if name == "search_medical_evidence":
+                extracted_age = _extract_patient_age(question)
+
+                if extracted_age is not None:
+                    args["patient_age"] = extracted_age
+                else:
+                    args.pop("patient_age", None)
+
+                args["patient_pregnancy_status"] = (
+                    _extract_patient_pregnancy_status(question)
+                )
+                args["original_question"] = question
+
+                if not args.get("query"):
+                    args["query"] = (
+                        extract_clinical_research_topic(question)
+                    )
+
+            normalized_tool_calls.append(
+                {
+                    "name": name,
+                    "args": args,
+                    "id": tool_call["id"],
+                    "type": "tool_call",
+                }
+            )
+
+        response = AIMessage(
+            content=response.content,
+            tool_calls=normalized_tool_calls,
+        )
+
+        print(
+            "[ROUTING] selected_tools: "
+            + ", ".join(
+                call["name"] for call in normalized_tool_calls
+            )
+        )
+
+        return {"messages": [response]}
 
     except Exception as exc:
         print(
@@ -3317,183 +3311,272 @@ def agent_node(state: MessagesState) -> dict[str, Any]:
             ]
         }
 
-# ============================================================
-# 10. GRAPH ROUTING
-# ============================================================
+
+
+MAX_TOOL_ITERATIONS = 4
+
 
 def route_after_agent(state: MessagesState) -> str:
-    """Choose the next graph node."""
+    """Choose the next graph node with a bounded tool loop."""
 
-    last_message = state["messages"][-1]
+    messages = state["messages"]
+
+    if not messages:
+        return "final_answer"
+
+    last_message = messages[-1]
 
     if (
         isinstance(last_message, AIMessage)
         and last_message.tool_calls
     ):
-        return "tools"
+        # Count tool-call batches in the current user turn only.
+        last_user_index = next(
+            (
+                index
+                for index in range(len(messages) - 1, -1, -1)
+                if isinstance(messages[index], HumanMessage)
+            ),
+            0,
+        )
 
-    return "end"
+        tool_iterations = sum(
+            1
+            for message in messages[last_user_index + 1:]
+            if (
+                isinstance(message, AIMessage)
+                and message.tool_calls
+            )
+        )
+
+        if tool_iterations <= MAX_TOOL_ITERATIONS:
+            return "tools"
+
+        print(
+            "[ROUTING] Maximum tool iterations reached."
+        )
+        return "final_answer"
+
+    return "final_answer"
+
+# ============================================================
+# 11. VALIDATE TOOL RESULTS
+# ============================================================
+
+def validation_node(
+    state: MessagesState,
+) -> dict[str, Any]:
+    """
+    Validate every tool result produced in the latest tool batch.
+    Replace invalid results with safe fallback ToolMessages.
+    """
+
+    messages = state["messages"]
+
+    # Find the latest AI message that requested tools.
+    tool_call_message = next(
+        (
+            message
+            for message in reversed(messages)
+            if isinstance(message, AIMessage)
+            and message.tool_calls
+        ),
+        None,
+    )
+
+    if tool_call_message is None:
+        return {}
+
+    expected_tool_ids = {
+        call["id"]
+        for call in tool_call_message.tool_calls
+    }
+
+    replacements = []
+
+    for tool_message in messages:
+
+        if (
+            not isinstance(tool_message, ToolMessage)
+            or tool_message.tool_call_id not in expected_tool_ids
+        ):
+            continue
+
+        try:
+            content = tool_message.content
+
+            if isinstance(content, str):
+                result = json.loads(content)
+            else:
+                result = content
+
+            if tool_message.name == "search_medical_evidence":
+
+                if not validate_pubmed_result(result):
+                    raise ValueError(
+                        "PubMed result failed schema validation."
+                    )
+
+                print(
+                    "[VALIDATION] PubMed result schema: PASS"
+                )
+
+            elif tool_message.name == "check_drug_interactions":
+
+                if not validate_result(result):
+                    raise ValueError(
+                        "Medication result failed schema validation."
+                    )
+
+                print(
+                    "[VALIDATION] Medication result schema: PASS"
+                )
+
+            else:
+                raise ValueError(
+                    "Unknown tool result."
+                )
+
+        except (
+            json.JSONDecodeError,
+            ValueError,
+            TypeError,
+        ) as exc:
+
+            print(
+                f"[VALIDATION] {tool_message.name}: FAIL ({exc})"
+            )
+
+            if tool_message.name == "search_medical_evidence":
+
+                fallback = {
+                    "status": "SEARCH_ERROR",
+                    "query": "",
+                    "search_query": "",
+                    "source": "PubMed / NCBI",
+                    "result_count": 0,
+                    "candidate_count": 0,
+                    "results": [],
+                    "limitations": [
+                        "The PubMed result failed schema validation.",
+                        "The returned evidence could not be safely processed.",
+                        "Do not use this invalid result for medical decisions.",
+                    ],
+                }
+
+                fallback_content = json.dumps(
+                    fallback,
+                    indent=2,
+                    ensure_ascii=False,
+                )
+
+            else:
+
+                fallback = make_result(
+                    status="INSUFFICIENT_INFORMATION",
+                    medications=[],
+                    interaction_found=None,
+                    evidence=[
+                        "The tool result could not be validated."
+                    ],
+                    limitations=[
+                        "The interaction result could not be validated."
+                    ],
+                    next_step=(
+                        "Try again. Do not use an invalid result "
+                        "to make medication decisions."
+                    ),
+                )
+
+                fallback_content = serialize_result(fallback)
+
+            replacements.append(
+                ToolMessage(
+                    content=fallback_content,
+                    name=tool_message.name,
+                    tool_call_id=tool_message.tool_call_id,
+                    id=tool_message.id,
+                    status=tool_message.status,
+                )
+            )
+
+    return {
+        "messages": replacements
+    } if replacements else {}
 
 
 # ============================================================
 # 11. FORMAT TOOL RESULTS
 # ============================================================
 
+
 def final_answer_node(
     state: MessagesState,
 ) -> dict[str, Any]:
     """
-    Validate and format the JSON returned by the tools.
+    Preserve the agent's final natural-language answer.
+    Tool results are validated separately by validation_node.
     """
 
-    tool_message = None
+    messages = state["messages"]
 
-    for message in reversed(state["messages"]):
-        if isinstance(message, ToolMessage):
-            tool_message = message
-            break
-
-    if tool_message is None:
-        fallback = make_result(
-            status="INSUFFICIENT_INFORMATION",
-            medications=[],
-            interaction_found=None,
-            evidence=[
-                "No tool result was available to validate."
-            ],
-            limitations=[
-                "The interaction check could not be completed."
-            ],
-            next_step=(
-                "Try the question again or consult a "
-                "qualified healthcare professional."
-            ),
-        )
-
+    if not messages:
         return {
             "messages": [
                 AIMessage(
-                    content=serialize_result(fallback)
-                )
-            ]
-        }
-
-    try:
-        content = tool_message.content
-
-        if isinstance(content, str):
-            result = json.loads(content)
-        else:
-            result = content
-
-               # PubMed has its own result schema.
-        if tool_message.name == "search_medical_evidence":
-
-            if not validate_pubmed_result(result):
-                raise ValueError(
-                    "The PubMed result failed schema validation."
-                )
-
-            formatted_result = json.dumps(
-                result,
-                indent=2,
-                ensure_ascii=False,
-            )
-
-            print(
-                "[VALIDATION] PubMed result schema: PASS"
-            )
-
-        else:
-            if not validate_result(result):
-                raise ValueError(
-                    "The tool result failed schema validation."
-                )
-
-            formatted_result = serialize_result(result)
-
-            print(
-                "[VALIDATION] JSON schema: PASS"
-            )
-
-        return {
-            "messages": [
-                AIMessage(
-                    content=formatted_result
-                )
-            ]
-        }
-
-    except (
-        json.JSONDecodeError,
-        ValueError,
-        TypeError,
-    ) as exc:
-
-        print(
-            f"[VALIDATION] JSON schema: FAIL ({exc})"
-        )
-
-        # PubMed has its own result schema.
-        if tool_message.name == "search_medical_evidence":
-
-            fallback = {
-                "status": "SEARCH_ERROR",
-                "query": "",
-                "search_query": "",
-                "source": "PubMed / NCBI",
-                "result_count": 0,
-                "candidate_count": 0,
-                "results": [],
-                "limitations": [
-                    "The PubMed tool returned a result that failed schema validation.",
-                    "The returned evidence could not be safely processed.",
-                    "Do not use this invalid result for medical decisions.",
-                ],
-            }
-
-            return {
-                "messages": [
-                    AIMessage(
-                        content=json.dumps(
-                            fallback,
-                            indent=2,
-                            ensure_ascii=False,
-                        )
+                    content=(
+                        "No response could be generated. "
+                        "Please try again."
                     )
-                ]
-            }
-
-        # Medication interaction fallback.
-        fallback = make_result(
-            status="INSUFFICIENT_INFORMATION",
-            medications=[],
-            interaction_found=None,
-            evidence=[
-                "The tool returned a result that could not "
-                "be validated against the expected JSON schema."
-            ],
-            limitations=[
-                "The interaction result could not be validated."
-            ],
-            next_step=(
-                "Try the question again. Do not use an invalid "
-                "result to make medication decisions."
-            ),
-        )
-
-        return {
-            "messages": [
-                AIMessage(
-                    content=serialize_result(fallback)
                 )
             ]
         }
+
+    last_message = messages[-1]
+
+    # The agent has already produced its final answer.
+    if (
+        isinstance(last_message, AIMessage)
+        and not last_message.tool_calls
+    ):
+        return {}
+
+    # A tool call reached the final node without execution.
+    if (
+        isinstance(last_message, AIMessage)
+        and last_message.tool_calls
+    ):
+        return {
+            "messages": [
+                AIMessage(
+                    content=(
+                        "The investigation reached its tool-use "
+                        "limit before all requested steps could "
+                        "be completed. The available validated "
+                        "results may be incomplete. Please try "
+                        "again or consult a qualified healthcare "
+                        "professional."
+                    )
+                )
+            ]
+        }
+
+    return {
+        "messages": [
+            AIMessage(
+                content=(
+                    "The investigation could not produce a "
+                    "complete final response. Please try again."
+                )
+            )
+        ]
+    }
 
 
 # ============================================================
 # 12. BUILD THE LANGGRAPH WORKFLOW
 # ============================================================
+
 
 builder = StateGraph(MessagesState)
 
@@ -3513,6 +3596,11 @@ builder.add_node(
 )
 
 builder.add_node(
+    "validation",
+    validation_node,
+)
+
+builder.add_node(
     "final_answer",
     final_answer_node,
 )
@@ -3527,13 +3615,18 @@ builder.add_conditional_edges(
     route_after_agent,
     {
         "tools": "tools",
-        "end": END,
+        "final_answer": "final_answer",
     },
 )
 
 builder.add_edge(
     "tools",
-    "final_answer",
+    "validation",
+)
+
+builder.add_edge(
+    "validation",
+    "agent",
 )
 
 builder.add_edge(
@@ -3542,7 +3635,6 @@ builder.add_edge(
 )
 
 graph = builder.compile()
-
 
 # ============================================================
 # 13. PREDEFINED TEST QUESTIONS

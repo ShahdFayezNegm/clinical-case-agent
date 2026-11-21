@@ -1,3 +1,5 @@
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+import graph_app
 from datetime import date, timedelta
 import json
 import xml.etree.ElementTree as ET
@@ -1754,18 +1756,52 @@ def test_extract_patient_pregnancy_status():
     assert _extract_patient_pregnancy_status(
         "Patient is not currently pregnant"
     ) == "not_pregnant"
-def test_agent_node_passes_patient_pregnancy_status():
-    from graph_app import agent_node
-    from langchain_core.messages import HumanMessage
+def test_agent_node_passes_patient_pregnancy_status(monkeypatch):
+    import graph_app
+    from langchain_core.messages import AIMessage, HumanMessage
+
+    class FakeLLMWithTools:
+        def invoke(self, messages):
+            return AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "search_medical_evidence",
+                        "args": {
+                            "query": "clinical research",
+                        },
+                        "id": "test-pubmed-call",
+                        "type": "tool_call",
+                    }
+                ],
+            )
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(
+        graph_app,
+        "llm_with_tools",
+        FakeLLMWithTools(),
+    )
+
+    def reject_legacy_llm_call(self, messages):
+        raise AssertionError(
+            "The legacy llm.invoke path must not be used."
+        )
+
+    monkeypatch.setattr(
+        type(graph_app.llm),
+        "invoke",
+        reject_legacy_llm_call,
+    )
 
     cases = [
-        ("Patient is pregnant. Research clinical studies.", "pregnant"),
-        ("Patient is not pregnant. Research clinical studies.", "not_pregnant"),
-        ("Patient pregnancy status is unknown. Research clinical studies.", "unknown"),
+        ("Patient is pregnant and has vitamin B12 deficiency with numbness.", "pregnant"),
+        ("Patient is not pregnant and has vitamin B12 deficiency with numbness.", "not_pregnant"),
+        ("Patient pregnancy status is unknown and has vitamin B12 deficiency with numbness.", "unknown"),
     ]
 
     for question, expected_status in cases:
-        result = agent_node({
+        result = graph_app.agent_node({
             "messages": [HumanMessage(content=question)]
         })
 
@@ -1773,6 +1809,7 @@ def test_agent_node_passes_patient_pregnancy_status():
 
         assert tool_call["name"] == "search_medical_evidence"
         assert tool_call["args"]["patient_pregnancy_status"] == expected_status
+        assert tool_call["args"]["original_question"] == question
 def test_pregnancy_detection_returns_false_for_incidental_gestational_diabetes():
     import xml.etree.ElementTree as ET
 
@@ -2348,3 +2385,369 @@ def test_gi_malignancy_queries_require_both_concepts():
     )
 
     assert "gastrointestinal bleeding AND malignancy" not in queries
+
+
+
+def test_agent_node_returns_direct_llm_answer(monkeypatch):
+    import graph_app
+    from langchain_core.messages import AIMessage, HumanMessage
+
+    class FakeLLMWithTools:
+        def invoke(self, messages):
+            return AIMessage(
+                content="Vitamin B12 is important for nerve function.",
+            )
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(
+        graph_app,
+        "llm_with_tools",
+        FakeLLMWithTools(),
+    )
+
+    result = graph_app.agent_node({
+        "messages": [
+            HumanMessage(content="What is vitamin B12?")
+        ]
+    })
+
+    response = result["messages"][0]
+
+    assert response.content == (
+        "Vitamin B12 is important for nerve function."
+    )
+    assert response.tool_calls == []
+
+
+def test_agent_node_accepts_dynamic_drug_interaction_tool_call(
+    monkeypatch,
+):
+    import graph_app
+    from langchain_core.messages import AIMessage, HumanMessage
+
+    class FakeLLMWithTools:
+        def invoke(self, messages):
+            return AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "check_drug_interactions",
+                        "args": {
+                            "question": (
+                                "Can warfarin and aspirin interact?"
+                            ),
+                        },
+                        "id": "test-drug-call",
+                        "type": "tool_call",
+                    }
+                ],
+            )
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(
+        graph_app,
+        "llm_with_tools",
+        FakeLLMWithTools(),
+    )
+
+    result = graph_app.agent_node({
+        "messages": [
+            HumanMessage(
+                content="Can warfarin and aspirin interact?"
+            )
+        ]
+    })
+
+    tool_call = result["messages"][0].tool_calls[0]
+
+    assert tool_call["name"] == "check_drug_interactions"
+    assert tool_call["args"]["question"] == (
+        "Can warfarin and aspirin interact?"
+    )
+
+def test_route_after_agent_sends_direct_answer_to_final():
+    state = {
+        "messages": [
+            HumanMessage(content="What is Machine Learning?"),
+            AIMessage(content="Machine Learning is a field of AI."),
+        ]
+    }
+
+    assert graph_app.route_after_agent(state) == "final_answer"
+
+def test_route_after_agent_sends_tool_call_to_tools():
+    state = {
+        "messages": [
+            HumanMessage(
+                content="Can warfarin and aspirin interact?"
+            ),
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "check_drug_interactions",
+                        "args": {
+                            "question": (
+                                "Can warfarin and aspirin interact?"
+                            )
+                        },
+                        "id": "test-tool-call-1",
+                        "type": "tool_call",
+                    }
+                ],
+            ),
+        ]
+    }
+
+    assert graph_app.route_after_agent(state) == "tools"
+
+def test_route_after_agent_stops_after_max_tool_iterations():
+    messages = [
+        HumanMessage(content="Investigate this clinical case.")
+    ]
+
+    for index in range(5):
+        messages.append(
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "search_medical_evidence",
+                        "args": {"query": "clinical evidence"},
+                        "id": f"test-tool-call-{index}",
+                        "type": "tool_call",
+                    }
+                ],
+            )
+        )
+
+    state = {"messages": messages}
+
+    assert graph_app.route_after_agent(state) == "final_answer"
+
+def test_validation_node_replaces_invalid_pubmed_result():
+    state = {
+        "messages": [
+            HumanMessage(
+                content="Find medical evidence about aspirin."
+            ),
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "search_medical_evidence",
+                        "args": {"query": "aspirin"},
+                        "id": "pubmed-call-1",
+                        "type": "tool_call",
+                    }
+                ],
+            ),
+            ToolMessage(
+                content="not-valid-json",
+                name="search_medical_evidence",
+                tool_call_id="pubmed-call-1",
+                id="pubmed-result-1",
+            ),
+        ]
+    }
+
+    result = graph_app.validation_node(state)
+
+    assert len(result["messages"]) == 1
+
+    replacement = result["messages"][0]
+    parsed_result = json.loads(replacement.content)
+
+    assert replacement.tool_call_id == "pubmed-call-1"
+    assert parsed_result["status"] == "SEARCH_ERROR"
+    assert parsed_result["results"] == []
+    assert parsed_result["limitations"]
+
+def test_validation_node_replaces_invalid_drug_result():
+    state = {
+        "messages": [
+            HumanMessage(
+                content="Can warfarin and aspirin interact?"
+            ),
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "check_drug_interactions",
+                        "args": {
+                            "question": (
+                                "Can warfarin and aspirin interact?"
+                            )
+                        },
+                        "id": "drug-call-1",
+                        "type": "tool_call",
+                    }
+                ],
+            ),
+            ToolMessage(
+                content="invalid-result",
+                name="check_drug_interactions",
+                tool_call_id="drug-call-1",
+                id="drug-result-1",
+            ),
+        ]
+    }
+
+    result = graph_app.validation_node(state)
+
+    assert len(result["messages"]) == 1
+
+    replacement = result["messages"][0]
+    parsed_result = json.loads(replacement.content)
+
+    assert replacement.tool_call_id == "drug-call-1"
+    assert parsed_result["status"] == "INSUFFICIENT_INFORMATION"
+    assert parsed_result["interaction_found"] is None
+    assert parsed_result["limitations"]
+
+def test_final_answer_node_preserves_agent_answer():
+    expected_answer = (
+        "Warfarin and aspirin may increase bleeding risk."
+    )
+
+    state = {
+        "messages": [
+            HumanMessage(
+                content="Can warfarin and aspirin interact?"
+            ),
+            AIMessage(content=expected_answer),
+        ]
+    }
+
+    result = graph_app.final_answer_node(state)
+
+    assert result == {}
+
+def test_dynamic_workflow_completes_tool_cycle(monkeypatch):
+    from langgraph.graph import StateGraph, START, END
+    from langgraph.graph import MessagesState
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+
+    class FakeLLMWithTools:
+        def __init__(self):
+            self.calls = 0
+
+        def invoke(self, messages):
+            self.calls += 1
+
+            if self.calls == 1:
+                return AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "check_drug_interactions",
+                            "args": {
+                                "question": (
+                                    "Can warfarin and aspirin interact?"
+                                )
+                            },
+                            "id": "integration-tool-call-1",
+                            "type": "tool_call",
+                        }
+                    ],
+                )
+
+            tool_messages = [
+                message
+                for message in messages
+                if isinstance(message, ToolMessage)
+            ]
+
+            assert tool_messages
+            validated_result = json.loads(
+                tool_messages[-1].content
+            )
+
+            assert validated_result["status"] == (
+                "POTENTIAL_INTERACTION"
+            )
+
+            return AIMessage(
+                content=(
+                    "Warfarin and aspirin may increase "
+                    "the risk of bleeding."
+                )
+            )
+
+    fake_llm = FakeLLMWithTools()
+
+    monkeypatch.setattr(
+        graph_app,
+        "llm_with_tools",
+        fake_llm,
+    )
+
+    def fake_tool_node(state):
+        last_message = state["messages"][-1]
+        tool_call = last_message.tool_calls[0]
+
+        result = graph_app.make_result(
+            status="POTENTIAL_INTERACTION",
+            medications=["warfarin", "aspirin"],
+            interaction_found=True,
+            evidence=["Synthetic test evidence."],
+            limitations=["This is a simulated test result."],
+            next_step="Consult a qualified healthcare professional.",
+        )
+
+        return {
+            "messages": [
+                ToolMessage(
+                    content=graph_app.serialize_result(result),
+                    name=tool_call["name"],
+                    tool_call_id=tool_call["id"],
+                )
+            ]
+        }
+
+    builder = StateGraph(MessagesState)
+
+    builder.add_node("agent", graph_app.agent_node)
+    builder.add_node("tools", fake_tool_node)
+    builder.add_node("validation", graph_app.validation_node)
+    builder.add_node("final_answer", graph_app.final_answer_node)
+
+    builder.add_edge(START, "agent")
+
+    builder.add_conditional_edges(
+        "agent",
+        graph_app.route_after_agent,
+        {
+            "tools": "tools",
+            "final_answer": "final_answer",
+        },
+    )
+
+    builder.add_edge("tools", "validation")
+    builder.add_edge("validation", "agent")
+    builder.add_edge("final_answer", END)
+
+    test_graph = builder.compile()
+
+    result = test_graph.invoke({
+        "messages": [
+            HumanMessage(
+                content="Can warfarin and aspirin interact?"
+            )
+        ]
+    })
+
+    final_message = result["messages"][-1]
+
+    assert isinstance(final_message, AIMessage)
+    assert "bleeding" in final_message.content.lower()
+    assert fake_llm.calls == 2
+
+    tool_messages = [
+        message
+        for message in result["messages"]
+        if isinstance(message, ToolMessage)
+    ]
+
+    assert len(tool_messages) == 1
