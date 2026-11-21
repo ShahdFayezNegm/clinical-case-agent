@@ -2139,3 +2139,65 @@ def test_age_relevance_penalizes_child_only_for_middle_aged_patient():
     )
 
     assert score == -3
+def test_topic_concepts_recognizes_gi_bleeding_and_malignancy():
+    from graph_app import _topic_concepts
+
+    concepts = _topic_concepts(
+        "gastrointestinal bleeding and malignancy"
+    )
+
+    assert concepts == [
+        "gastrointestinal bleeding",
+        "gastrointestinal malignancy",
+    ]
+
+def test_gi_bleeding_malignancy_relevance_scores_related_study_higher():
+    from graph_app import _relevance_score
+
+    topic = "gastrointestinal bleeding and malignancy"
+
+    relevant_score, relevant_matches = _relevance_score(
+        topic,
+        "Malignancy-related gastrointestinal bleeding",
+        "",
+    )
+
+    unrelated_score, _ = _relevance_score(
+        topic,
+        "Management of chronic respiratory disease",
+        "",
+    )
+
+    assert relevant_score > unrelated_score
+    assert "gastrointestinal bleeding" in relevant_matches
+    assert "gastrointestinal malignancy" in relevant_matches
+
+def test_extract_pubmed_topic_removes_evidence_question_prefix():
+    from graph_app import extract_pubmed_topic
+
+    topic = extract_pubmed_topic(
+        "What evidence is available regarding gastrointestinal bleeding and malignancy?"
+    )
+
+    assert topic == "gastrointestinal bleeding and malignancy"
+
+def test_build_pubmed_queries_for_gi_bleeding_and_malignancy():
+    from graph_app import _build_pubmed_queries
+
+    queries = _build_pubmed_queries(
+        "gastrointestinal bleeding and malignancy"
+    )
+
+    assert "gastrointestinal bleeding AND malignancy" in queries
+    assert "gastrointestinal hemorrhage AND neoplasms" in queries
+    assert "cancer-related gastrointestinal bleeding" in queries
+
+
+def test_gi_malignancy_queries_require_both_concepts():
+    from graph_app import _build_pubmed_queries
+
+    queries = _build_pubmed_queries(
+        "gastrointestinal bleeding"
+    )
+
+    assert "gastrointestinal bleeding AND malignancy" not in queries

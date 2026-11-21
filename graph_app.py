@@ -839,6 +839,25 @@ _RELEVANCE_CONCEPTS = {
         "blood loss",
     ),
 
+    "gastrointestinal bleeding": (
+        "gastrointestinal bleeding",
+        "gastrointestinal hemorrhage",
+        "gastrointestinal haemorrhage",
+        "upper gastrointestinal bleeding",
+        "lower gastrointestinal bleeding",
+        "gi bleeding",
+    ),
+
+    "gastrointestinal malignancy": (
+        "gastrointestinal malignancy",
+        "malignancy-related gastrointestinal bleeding",
+        "gastrointestinal cancer",
+        "gastrointestinal neoplasm",
+        "colorectal cancer",
+        "gastric cancer",
+        "malignancy",
+    ),
+
     "risk/safety": (
         "risk",
         "safety",
@@ -993,6 +1012,7 @@ def extract_pubmed_topic(question: str) -> str:
 
     # Remove common request prefixes
     prefixes = (
+        r"^\s*what\s+evidence\s+(?:is|are)\s+available\s+(?:regarding|about|for|on)\s+",
         r"^\s*(?:please\s+)?(?:find|search for|search|look up|retrieve)\s+",
         r"^\s*(?:published\s+)?(?:clinical\s+)?(?:studies|systematic\s+reviews)\s+(?:and\s+systematic\s+reviews\s+)?(?:reporting|that\s+report|about|on|regarding)\s+",
         r"^\s*pubmed\s+(?:about|for|on)\s+",
@@ -1245,6 +1265,13 @@ def _topic_concepts(topic: str) -> list[str]:
         ):
             concepts.append(concept)
 
+    # Prefer the specific gastrointestinal bleeding concept over generic bleeding.
+    if (
+        "gastrointestinal bleeding" in concepts
+        and "bleeding" in concepts
+    ):
+        concepts.remove("bleeding")
+
     # Keep meaningful exact query terms too, but do not let generic request
     # words dominate ranking. These are matched literally against title/abstract.
 
@@ -1326,6 +1353,8 @@ def _relevance_score(
         "vitamin b12 deficiency": 8,
         "aspirin": 8,
         "bleeding": 8,
+        "gastrointestinal bleeding": 12,
+        "gastrointestinal malignancy": 12,
         "risk/safety": 2,
         "wearable technology": 7,
         "arrhythmia": 10,
@@ -2316,6 +2345,34 @@ def _build_pubmed_queries(
             "iron deficiency anemia AND pregnant women",
             "iron deficiency AND pregnancy AND ferritin",
             "iron supplementation AND pregnancy AND anemia",
+        ])
+
+    has_gi_bleeding = any(
+        term in topic_lower
+        for term in (
+            "gastrointestinal bleeding",
+            "gastrointestinal hemorrhage",
+            "gastrointestinal haemorrhage",
+            "gi bleeding",
+        )
+    )
+
+    has_malignancy = any(
+        term in topic_lower
+        for term in (
+            "malignancy",
+            "malignancies",
+            "cancer",
+            "neoplasm",
+            "neoplasms",
+        )
+    )
+
+    if has_gi_bleeding and has_malignancy:
+        queries.extend([
+            "gastrointestinal bleeding AND malignancy",
+            "gastrointestinal hemorrhage AND neoplasms",
+            "cancer-related gastrointestinal bleeding",
         ])
 
     if not queries:
