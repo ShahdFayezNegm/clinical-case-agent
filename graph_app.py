@@ -2968,7 +2968,7 @@ def is_evidence_question(question: str) -> bool:
 
     pattern = (
         r"\b("
-        r"medical evidence|scientific evidence|"
+        r"medical evidence|scientific evidence|evidence|"
         r"research|clinical studies|pubmed|medical literature|"
         r"clinical evidence|published studies|"
         r"systematic reviews?|meta-analyses?|"

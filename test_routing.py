@@ -109,3 +109,20 @@ def test_diagnostic_accuracy_research_question_uses_pubmed():
     tool_name = get_tool_name(question)
 
     assert tool_name == "search_medical_evidence"
+
+def test_evidence_available_question_uses_pubmed():
+    question = (
+        "What evidence is available regarding gastrointestinal "
+        "bleeding and malignancy?"
+    )
+
+    assert get_tool_name(question) == "search_medical_evidence"
+
+
+def test_medical_literature_question_uses_pubmed():
+    question = (
+        "What does the medical literature say about celiac disease "
+        "and iron deficiency anemia?"
+    )
+
+    assert get_tool_name(question) == "search_medical_evidence"
