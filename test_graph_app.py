@@ -625,6 +625,13 @@ def test_age_relevance_rewards_matching_age_group():
 
     assert score == 3
 
+def test_age_relevance_rewards_adult_group_for_middle_aged_patient():
+    score = _age_relevance_score(
+        55,
+        ["Adult"],
+    )
+
+    assert score == 3
 
 def test_age_relevance_penalizes_mismatched_age_group():
     score = _age_relevance_score(

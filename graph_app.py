@@ -2125,6 +2125,8 @@ def _age_relevance_score(
         return 3
 
     if "Adult" in article_age_groups:
+        if patient_age is not None and 25 <= patient_age <= 64:
+            return 3
         return 0
 
     if article_age_groups:
