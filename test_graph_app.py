@@ -931,6 +931,150 @@ def test_unrelated_topic_does_not_score_anemia_markers():
     assert matched == []
 
 
+def test_diabetes_topic_scores_only_diabetes_markers():
+    abstract = (
+        "HbA1c, fasting plasma glucose and "
+        "oral glucose tolerance test were measured. "
+        "Creatinine and TSH were also reported."
+    )
+
+    score, matched = _marker_coverage_score(
+        "",
+        abstract,
+        "type 2 diabetes",
+    )
+
+    assert score == 9
+    assert set(matched) == {
+        "hba1c",
+        "fasting_glucose",
+        "oral_glucose_tolerance",
+    }
+
+
+def test_kidney_topic_scores_only_kidney_markers():
+    abstract = (
+        "Creatinine, eGFR, blood urea nitrogen and "
+        "cystatin C were measured. ALT was also reported."
+    )
+
+    score, matched = _marker_coverage_score(
+        "",
+        abstract,
+        "chronic kidney disease",
+    )
+
+    assert score == 12
+    assert set(matched) == {
+        "creatinine",
+        "egfr",
+        "blood_urea_nitrogen",
+        "cystatin_c",
+    }
+
+
+def test_liver_topic_scores_only_liver_markers():
+    abstract = (
+        "ALT, AST, alkaline phosphatase, GGT, "
+        "bilirubin and albumin were measured. "
+        "Creatinine was also reported."
+    )
+
+    score, matched = _marker_coverage_score(
+        "",
+        abstract,
+        "liver function",
+    )
+
+    assert score == 18
+    assert set(matched) == {
+        "alt",
+        "ast",
+        "alp",
+        "ggt",
+        "bilirubin",
+        "albumin",
+    }
+
+
+def test_thyroid_topic_scores_only_thyroid_markers():
+    abstract = (
+        "TSH, free T4, free T3 and "
+        "thyroid peroxidase antibodies were measured. "
+        "Ferritin was also reported."
+    )
+
+    score, matched = _marker_coverage_score(
+        "",
+        abstract,
+        "thyroid disease",
+    )
+
+    assert score == 12
+    assert set(matched) == {
+        "tsh",
+        "free_t4",
+        "free_t3",
+        "thyroid_antibodies",
+    }
+
+
+def test_inflammation_topic_scores_only_inflammatory_markers():
+    abstract = (
+        "CRP, erythrocyte sedimentation rate and "
+        "procalcitonin were measured. Troponin was also reported."
+    )
+
+    score, matched = _marker_coverage_score(
+        "",
+        abstract,
+        "systemic inflammation",
+    )
+
+    assert score == 9
+    assert set(matched) == {
+        "crp",
+        "esr",
+        "procalcitonin",
+    }
+
+
+def test_cardiac_topic_scores_only_cardiac_markers():
+    abstract = (
+        "Troponin, BNP, NT-proBNP and CK-MB were measured. "
+        "TSH was also reported."
+    )
+
+    score, matched = _marker_coverage_score(
+        "",
+        abstract,
+        "cardiac biomarkers",
+    )
+
+    assert score == 12
+    assert set(matched) == {
+        "troponin",
+        "bnp",
+        "nt_probnp",
+        "ck_mb",
+    }
+
+
+def test_marker_coverage_is_not_applicable_for_unrelated_topic():
+    markers_text = (
+        "HbA1c, creatinine, ALT, TSH, CRP and troponin "
+        "were measured."
+    )
+
+    score, matched = _marker_coverage_score(
+        "",
+        markers_text,
+        "migraine",
+    )
+
+    assert score == 0
+    assert matched == []
+
 def test_combined_iron_and_b12_topic_scores_all_markers():
     abstract = (
         "Ferritin, transferrin saturation, methylmalonic acid, "
@@ -1111,7 +1255,7 @@ def test_select_diverse_articles_covers_multiple_queries():
         },
         {
             "title": "Article D",
-            "relevance_score": 22,
+            "relevance_score": 23,
             "marker_coverage_score": 3,
             "matched_queries": ["query_3"],
         },
@@ -1154,7 +1298,7 @@ def test_select_diverse_articles_does_not_overprioritize_query_diversity():
     assert selected[0]["title"] == "Highly relevant article"
     assert selected[1]["title"] == "Relevant article"
 
-def test_select_diverse_articles_prefers_relevance_and_marker_coverage():
+def test_select_diverse_articles_uses_relevance_not_marker_coverage():
     results = [
         {
             "title": "High relevance",
@@ -1169,17 +1313,20 @@ def test_select_diverse_articles_prefers_relevance_and_marker_coverage():
             "matched_queries": ["query_2"],
         },
         {
-            "title": "Lower combined score",
+            "title": "Lower relevance",
             "relevance_score": 20,
-            "marker_coverage_score": 3,
+            "marker_coverage_score": 15,
             "matched_queries": ["query_3"],
         },
     ]
 
     selected = _select_diverse_articles(results, limit=3)
 
-    assert selected[0]["title"] == "High marker coverage"
-    assert selected[1]["title"] == "High relevance"
+    assert [item["title"] for item in selected] == [
+        "High relevance",
+        "High marker coverage",
+        "Lower relevance",
+    ]
 def test_select_diverse_articles_uses_age_relevance_score():
     results = [
         {

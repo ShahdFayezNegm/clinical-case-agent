@@ -1543,14 +1543,11 @@ def _relevance_score(
 
     return score, list(dict.fromkeys(matched))
 
-def _marker_coverage_score(
-    title: str,
-    abstract: str,
-    topic: str | None = None,
-) -> tuple[int, list[str]]:
-    """Score topic-specific coverage of relevant laboratory markers."""
 
-    text = f"{title} {abstract}".lower()
+def _get_applicable_marker_groups(
+    topic: str | None,
+) -> dict[str, list[str]]:
+    """Return laboratory markers relevant to the research topic."""
 
     all_markers = {
         "ferritin": [r"\bferritin\b"],
@@ -1566,58 +1563,212 @@ def _marker_coverage_score(
             r"\bmean corpuscular volume\b",
             r"\bmcv\b",
         ],
+        "hba1c": [
+            r"\bhba1c\b",
+            r"\bhemoglobin a1c\b",
+            r"\bglycated hemoglobin\b",
+        ],
+        "fasting_glucose": [
+            r"\bfasting blood glucose\b",
+            r"\bfasting plasma glucose\b",
+            r"\bfpg\b",
+        ],
+        "oral_glucose_tolerance": [
+            r"\boral glucose tolerance\b",
+            r"\bogtt\b",
+        ],
+        "creatinine": [r"\bcreatinine\b"],
+        "egfr": [
+            r"\begfr\b",
+            r"\bestimated glomerular filtration rate\b",
+        ],
+        "blood_urea_nitrogen": [
+            r"\bblood urea nitrogen\b",
+            r"\bbun\b",
+        ],
+        "cystatin_c": [r"\bcystatin c\b"],
+        "alt": [
+            r"\balanine aminotransferase\b",
+            r"\balt\b",
+        ],
+        "ast": [
+            r"\baspartate aminotransferase\b",
+            r"\bast\b",
+        ],
+        "alp": [
+            r"\balkaline phosphatase\b",
+            r"\balp\b",
+        ],
+        "ggt": [
+            r"\bgamma.?glutamyl transferase\b",
+            r"\bggt\b",
+        ],
+        "bilirubin": [r"\bbilirubin\b"],
+        "albumin": [r"\balbumin\b"],
+        "tsh": [r"\bthyroid stimulating hormone\b", r"\btsh\b"],
+        "free_t4": [
+            r"\bfree thyroxine\b",
+            r"\bfree t4\b",
+            r"\bft4\b",
+        ],
+        "free_t3": [
+            r"\bfree triiodothyronine\b",
+            r"\bfree t3\b",
+            r"\bft3\b",
+        ],
+        "thyroid_antibodies": [
+            r"\bthyroid peroxidase antibodies\b",
+            r"\btpo antibodies\b",
+            r"\bthyroglobulin antibodies\b",
+        ],
+        "crp": [r"\bc reactive protein\b", r"\bcrp\b"],
+        "esr": [
+            r"\berythrocyte sedimentation rate\b",
+            r"\besr\b",
+        ],
+        "procalcitonin": [r"\bprocalcitonin\b"],
+        "troponin": [r"\btroponin\b"],
+        "bnp": [
+            r"\bb-type natriuretic peptide\b",
+            r"\bbnp\b",
+        ],
+        "nt_probnp": [r"\bnt.?pro.?bnp\b"],
+        "ck_mb": [
+            r"\bck.?mb\b",
+            r"\bcreatine kinase.?mb\b",
+        ],
     }
 
-    # Preserve the original behavior for existing two-argument calls.
     if topic is None:
-        markers = all_markers
+        return all_markers
 
-    else:
-        normalized_topic = topic.lower()
+    normalized_topic = topic.lower()
+    markers: dict[str, list[str]] = {}
 
-        has_iron_topic = any(
-            term in normalized_topic
-            for term in (
-                "iron deficiency",
-                "ferritin",
-                "transferrin",
-            )
-        )
+    topic_groups = {
+        "iron": (
+            "iron deficiency",
+            "ferritin",
+            "transferrin",
+        ),
+        "b12": (
+            "vitamin b12",
+            "b12 deficiency",
+            "cobalamin",
+        ),
+        "diabetes": (
+            "diabetes",
+            "diabetic",
+            "hyperglycemia",
+            "hypoglycemia",
+            "blood glucose",
+            "blood sugar",
+        ),
+        "kidney": (
+            "kidney function",
+            "kidney disease",
+            "renal function",
+            "renal disease",
+            "chronic kidney",
+        ),
+        "liver": (
+            "liver function",
+            "liver disease",
+            "hepatic function",
+            "hepatic disease",
+        ),
+        "thyroid": (
+            "thyroid",
+            "hypothyroidism",
+            "hyperthyroidism",
+        ),
+        "inflammation": (
+            "inflammation",
+            "inflammatory markers",
+            "systemic inflammatory response",
+        ),
+        "cardiac": (
+            "cardiac markers",
+            "cardiac biomarkers",
+            "myocardial infarction",
+            "heart attack",
+            "heart failure",
+            "cardiac injury",
+        ),
+    }
 
-        has_b12_topic = any(
-            term in normalized_topic
-            for term in (
-                "vitamin b12",
-                "b12 deficiency",
-                "cobalamin",
-            )
-        )
+    group_markers = {
+        "iron": (
+            "ferritin",
+            "transferrin_saturation",
+            "mcv",
+        ),
+        "b12": (
+            "methylmalonic_acid",
+            "homocysteine",
+            "mcv",
+        ),
+        "diabetes": (
+            "hba1c",
+            "fasting_glucose",
+            "oral_glucose_tolerance",
+        ),
+        "kidney": (
+            "creatinine",
+            "egfr",
+            "blood_urea_nitrogen",
+            "cystatin_c",
+        ),
+        "liver": (
+            "alt",
+            "ast",
+            "alp",
+            "ggt",
+            "bilirubin",
+            "albumin",
+        ),
+        "thyroid": (
+            "tsh",
+            "free_t4",
+            "free_t3",
+            "thyroid_antibodies",
+        ),
+        "inflammation": (
+            "crp",
+            "esr",
+            "procalcitonin",
+        ),
+        "cardiac": (
+            "troponin",
+            "bnp",
+            "nt_probnp",
+            "ck_mb",
+        ),
+    }
 
-        markers = {}
+    for group, terms in topic_groups.items():
+        if any(term in normalized_topic for term in terms):
+            for marker in group_markers[group]:
+                markers[marker] = all_markers[marker]
 
-        if has_iron_topic:
-            markers.update({
-                "ferritin": all_markers["ferritin"],
-                "transferrin_saturation": (
-                    all_markers["transferrin_saturation"]
-                ),
-                "mcv": all_markers["mcv"],
-            })
+    return markers
 
-        if has_b12_topic:
-            markers.update({
-                "methylmalonic_acid": (
-                    all_markers["methylmalonic_acid"]
-                ),
-                "homocysteine": all_markers["homocysteine"],
-                "mcv": all_markers["mcv"],
-            })
 
-    matched_markers = []
+def _marker_coverage_score(
+    title: str,
+    abstract: str,
+    topic: str | None = None,
+) -> tuple[int, list[str]]:
+    """Score topic-specific coverage of relevant laboratory markers."""
 
-    for marker, patterns in markers.items():
-        if any(re.search(pattern, text) for pattern in patterns):
-            matched_markers.append(marker)
+    text = f"{title} {abstract}".lower()
+    markers = _get_applicable_marker_groups(topic)
+
+    matched_markers = [
+        marker
+        for marker, patterns in markers.items()
+        if any(re.search(pattern, text) for pattern in patterns)
+    ]
 
     coverage_score = len(matched_markers) * 3
 
@@ -2391,7 +2542,6 @@ def _select_diverse_articles(
     def article_score(item: dict[str, Any]) -> float:
         return (
             item["relevance_score"]
-            + item["marker_coverage_score"]
             + item.get("age_relevance_score", 0)
         )
 
@@ -2440,10 +2590,7 @@ def _select_diverse_articles(
         priorities = priorities_by_target.get(target_population, {})
         return priorities.get(population, 0)
     def core_score(item: dict[str, Any]) -> float:
-        return (
-            item["relevance_score"]
-            + item["marker_coverage_score"]
-        )
+        return item["relevance_score"]
 
     best_core_score = max(
         (core_score(item) for item in results),

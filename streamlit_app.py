@@ -11,8 +11,7 @@ except Exception:
 if api_key:
     os.environ["OPENROUTER_API_KEY"] = api_key
 
-from graph_app import graph
-
+from graph_app import graph, _get_applicable_marker_groups
 
 # ==================================================
 # 1. Page Configuration
@@ -692,6 +691,18 @@ if st.session_state.last_answer:
                         for query in matched_queries:
                             st.caption(f"• {query}")
 
+                    has_applicable_markers = bool(
+                     _get_applicable_marker_groups(
+                       st.session_state.last_question
+                     )
+                    )
+
+                    marker_coverage = (
+                        study.get("marker_coverage_score", "N/A")
+                        if has_applicable_markers
+                        else "N/A"
+                    )
+
                     score_col1, score_col2, score_col3, score_col4 = st.columns(4)
 
                     with score_col1:
@@ -703,7 +714,7 @@ if st.session_state.last_answer:
                     with score_col2:
                         st.caption(
                             f"Marker Coverage: "
-                            f"{study.get('marker_coverage_score', 'N/A')}"
+                            f"{marker_coverage}"
                         )
 
                     with score_col3:
