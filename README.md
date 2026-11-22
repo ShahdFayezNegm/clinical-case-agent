@@ -234,38 +234,41 @@ The application can use its medication interaction tool and PubMed search tool t
 
 ## Limitations and Safety
 
-This project is an experimental prototype and has important limitations:
+This project is an experimental AI prototype designed to support clinical case investigation through medical literature retrieval and medication interaction checking.
 
-- The local medication interaction database contains only a small number of predefined examples.
-- Medication name recognition depends on the aliases currently implemented.
-- The application does not access a comprehensive, live clinical drug interaction database.
-- PubMed retrieval may omit relevant publications.
-- Search ranking and case-relevance assessments are heuristic and are not independently clinically validated.
-- LLM-generated explanations may contain errors, omissions, or inaccurate interpretations of research papers.
-- Retrieved evidence must be checked against the original publications and interpreted by qualified healthcare professionals.
-- The application does not replace clinical judgment, professional review, or established medical information systems.
+Its current scope has several limitations:
 
-**No diagnosis, prescription, or individualized treatment decision should be made using this prototype. Medication decisions require qualified healthcare professional review.**
+- The medication interaction checker uses a predefined local database with limited medication coverage and aliases.
+- Medical evidence is retrieved from PubMed, so search results may not include every relevant publication.
+- Evidence ranking and case-relevance assessments use heuristic methods.
+- AI-generated explanations require verification against the original research publications.
+
+The system is intended to assist with organizing information and exploring medical evidence. It does not provide diagnoses, prescriptions, or treatment recommendations. All findings require qualified healthcare professional review.
 
 ## Privacy and Data Handling
 
-The application uses Streamlit session state to hold the current case question and investigation result during the session. It does not intentionally save clinical cases to a local database.
+The application uses Streamlit session state to temporarily maintain the current case question and investigation result during an active session. It does not intentionally store clinical cases in a local database.
 
-However:
-- Case information submitted to the agent is sent to OpenRouter for model processing.
-- Medical literature searches are sent to the NCBI PubMed service.
-- This project does not claim that submitted information remains exclusively on the user's device.
-- Users should submit fictional or properly anonymized cases only.
-- Do not submit names, contact details, medical record numbers, or other personally identifiable patient information.
+External services are used for the following operations:
 
-Data handling may also depend on the external services and their respective policies.
+- **OpenRouter:** Processes case information through the configured language model.
+- **NCBI PubMed:** Retrieves medical literature based on the investigation queries.
+
+For privacy and data protection, users should submit fictional or properly anonymized cases only. Personal identifiers and confidential patient information should not be entered.
+
+Data processing is also subject to the privacy and data-handling policies of the external services.
 
 ## Disclaimer
 
-This software is provided for educational and research purposes only. It is not intended for clinical use, diagnosis, treatment, or medical decision-making.
+This project is developed for educational and research purposes. It is a prototype for AI-assisted clinical case investigation and is not intended for independent clinical decision-making. Professional healthcare review is required before any clinical use of the information it produces.
+## About Me
 
-The developers make no guarantee regarding the accuracy, completeness, or clinical validity of generated responses or retrieved information. All findings require independent verification and qualified human review.
+**Shahd Fayez Negm**
 
+Computer Science and Artificial Intelligence graduate interested in AI Engineering, Machine Learning, and building practical AI applications.
+
+- **GitHub:** [ShahdFayezNegm](https://github.com/ShahdFayezNegm)
+- **LinkedIn:** [LinkedIn Profile](https://linkedin.com/in/shahd-fayez-70b9a331b)
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
