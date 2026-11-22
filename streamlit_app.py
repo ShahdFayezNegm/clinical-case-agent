@@ -650,12 +650,12 @@ if st.session_state.last_answer:
                     f"{journal}  ·  PMID: {pmid if pmid.isdigit() else 'N/A'}"
                 )
 
-                if (
-                    pmid.isdigit()
-                    and source_url == f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
-                ):
+                if pmid.isdigit():
+                    pubmed_url = (
+                        f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
+                    )
                     st.markdown(
-                        f"[View publication on PubMed]({source_url})"
+                        f"[View publication on PubMed]({pubmed_url})"
                     )
 
                 with st.expander("Read Abstract"):

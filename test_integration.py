@@ -1,15 +1,21 @@
+
 import json
-import os
 from unittest.mock import Mock, patch
 
-from langchain_core.messages import AIMessage, HumanMessage
-os.environ["OPENROUTER_API_KEY"] = "test-key"
-from graph_app import graph, llm
+import graph_app
+from langchain_core.messages import (
+    AIMessage,
+    HumanMessage,
+    ToolMessage,
+)
+
+from graph_app import graph
 
 
 # --------------------------------------------------
 # Helper functions
 # --------------------------------------------------
+
 def make_response(json_data=None, content=b"", status_code=200):
     response = Mock()
     response.status_code = status_code
@@ -23,19 +29,83 @@ def get_final_message(result):
     return result["messages"][-1]
 
 
+def make_tool_calling_llm(tool_name, tool_args):
+    """
+    Fake LLM that:
+    1. Requests execution of a specific tool.
+    2. Returns the actual tool result as its final response.
+
+    The real LangGraph workflow and ToolNode remain active.
+    """
+
+    class FakeLLMWithTools:
+        def __init__(self):
+            self.calls = 0
+
+        def invoke(self, messages):
+            self.calls += 1
+
+            if self.calls == 1:
+                return AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": tool_name,
+                            "args": tool_args,
+                            "id": "integration-tool-call",
+                            "type": "tool_call",
+                        }
+                    ],
+                )
+
+            tool_messages = [
+                message
+                for message in messages
+                if isinstance(message, ToolMessage)
+            ]
+
+            assert tool_messages, (
+                "Expected the executed tool result."
+            )
+
+            return AIMessage(
+                content=tool_messages[-1].content
+            )
+
+    return FakeLLMWithTools()
+
+
 # --------------------------------------------------
 # 1. Full workflow: medication interaction
 # --------------------------------------------------
 
-def test_graph_end_to_end_drug_interaction():
+def test_graph_end_to_end_drug_interaction(monkeypatch):
 
-    result = graph.invoke({
-        "messages": [
-            HumanMessage(
-                content="Does Zocor interact with Biaxin?"
-            )
-        ]
-    })
+    monkeypatch.setenv(
+        "OPENROUTER_API_KEY",
+        "test-key",
+    )
+
+    monkeypatch.setattr(
+        graph_app,
+        "llm_with_tools",
+        make_tool_calling_llm(
+            "check_drug_interactions",
+            {
+                "question": "Does Zocor interact with Biaxin?"
+            },
+        ),
+    )
+
+    result = graph.invoke(
+        {
+            "messages": [
+                HumanMessage(
+                    content="Does Zocor interact with Biaxin?"
+                )
+            ]
+        }
+    )
 
     final_message = get_final_message(result)
     output = json.loads(final_message.content)
@@ -55,8 +125,28 @@ def test_graph_end_to_end_drug_interaction():
 # --------------------------------------------------
 # 2. Full workflow: PubMed evidence search
 # --------------------------------------------------
+
 @patch("graph_app.requests.get")
-def test_graph_end_to_end_pubmed_search(mock_get):
+def test_graph_end_to_end_pubmed_search(
+    mock_get,
+    monkeypatch,
+):
+
+    monkeypatch.setenv(
+        "OPENROUTER_API_KEY",
+        "test-key",
+    )
+
+    monkeypatch.setattr(
+        graph_app,
+        "llm_with_tools",
+        make_tool_calling_llm(
+            "search_medical_evidence",
+            {
+                "query": "aspirin bleeding risk"
+            },
+        ),
+    )
 
     esearch_response = make_response(
         json_data={
@@ -103,101 +193,125 @@ def test_graph_end_to_end_pubmed_search(mock_get):
         efetch_response,
     ]
 
-    result = graph.invoke({
-        "messages": [
-            HumanMessage(
-                content=(
-                    "Find medical evidence about "
-                    "aspirin and bleeding risk."
+    result = graph.invoke(
+        {
+            "messages": [
+                HumanMessage(
+                    content=(
+                        "Find medical evidence about "
+                        "aspirin and bleeding risk."
+                    )
                 )
-            )
-        ]
-    })
+            ]
+        }
+    )
 
     final_message = get_final_message(result)
     output = json.loads(final_message.content)
 
     assert output["status"] == "SUCCESS"
+
     assert output["source"] == "PubMed / NCBI"
+
     assert output["result_count"] == 1
 
     assert output["results"][0]["pmid"] == "12345"
 
-    assert output["results"][0]["title"] == (
+    assert (
         "Aspirin and bleeding risk study"
+        in output["results"][0]["title"]
     )
 
     assert mock_get.call_count == 2
 
 
 # --------------------------------------------------
-# 3. Full workflow: general question through Ollama
+# 3. General question through the LLM
 # --------------------------------------------------
 
-def test_graph_end_to_end_general_question():
+def test_graph_general_question(monkeypatch):
 
-    with patch.object(
-        type(llm),
-        "invoke",
-        autospec=True
-    ) as mock_invoke:
+    monkeypatch.setenv(
+        "OPENROUTER_API_KEY",
+        "test-key",
+    )
 
-        mock_invoke.return_value = AIMessage(
-            content=(
-                "Machine Learning is a field of AI that "
-                "learns patterns from data."
-            )
+    mock_llm = Mock()
+
+    mock_llm.invoke.return_value = AIMessage(
+        content=(
+            "Machine Learning is a field of AI "
+            "that learns patterns from data."
         )
+    )
 
-        result = graph.invoke({
+    monkeypatch.setattr(
+        graph_app,
+        "llm_with_tools",
+        mock_llm,
+    )
+
+    result = graph.invoke(
+        {
             "messages": [
                 HumanMessage(
                     content="What is Machine Learning?"
                 )
             ]
-        })
+        }
+    )
 
-        final_message = get_final_message(result)
+    final_message = get_final_message(result)
 
-        assert isinstance(final_message, AIMessage)
+    assert isinstance(final_message, AIMessage)
 
-        assert "Machine Learning" in (
-            final_message.content
-        )
+    assert "Machine Learning" in final_message.content
 
-        mock_invoke.assert_called_once()
+    mock_llm.invoke.assert_called_once()
 
 
 # --------------------------------------------------
-# 4. Full workflow: Ollama failure handling
+# 4. LLM failure handling
 # --------------------------------------------------
 
-def test_graph_handles_ollama_failure():
+def test_graph_handles_llm_failure(monkeypatch):
 
-    with patch.object(
-        type(llm),
-        "invoke",
-        autospec=True
-    ) as mock_invoke:
+    monkeypatch.setenv(
+        "OPENROUTER_API_KEY",
+        "test-key",
+    )
 
-        mock_invoke.side_effect = RuntimeError(
-            "Ollama is unavailable"
-        )
+    mock_llm = Mock()
 
-        result = graph.invoke({
+    mock_llm.invoke.side_effect = RuntimeError(
+        "LLM service is unavailable"
+    )
+
+    monkeypatch.setattr(
+        graph_app,
+        "llm_with_tools",
+        mock_llm,
+    )
+
+    result = graph.invoke(
+        {
             "messages": [
                 HumanMessage(
-                    content="Explain artificial intelligence."
+                    content="What is Machine Learning?"
                 )
             ]
-        })
+        }
+    )
 
-        final_message = get_final_message(result)
+    final_message = get_final_message(result)
 
-        assert isinstance(final_message, AIMessage)
+    assert isinstance(final_message, AIMessage)
 
-        assert "could not generate a response" in (
-            final_message.content.lower()
-        )
+    assert (
+        "could not generate a response"
+        in final_message.content.lower()
+    )
 
-        assert "RuntimeError" in final_message.content
+    assert "RuntimeError" in final_message.content
+
+    mock_llm.invoke.assert_called_once()

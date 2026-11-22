@@ -1,4 +1,4 @@
-import json
+﻿import json
 import os
 import re
 import uuid
@@ -26,7 +26,7 @@ llm = ChatOpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=os.getenv("OPENROUTER_API_KEY") or "not-configured",
     temperature=0,
-    max_tokens=2048,
+    max_tokens=4096,
 )
 
 
@@ -3241,6 +3241,80 @@ llm_with_tools = llm.bind_tools(
 )
 
 
+def _compact_messages_for_llm(messages):
+    """Compact PubMed tool results for the LLM without changing UI messages."""
+
+    compacted_messages = []
+
+    study_fields = (
+        "pmid",
+        "title",
+        "journal",
+        "publication_date",
+        "abstract",
+        "source_url",
+        "study_design",
+        "article_types",
+        "study_population_relevance",
+    )
+
+    for message in messages:
+        if (
+            isinstance(message, ToolMessage)
+            and message.name == "search_medical_evidence"
+        ):
+            try:
+                data = json.loads(message.content)
+
+                if isinstance(data, dict):
+                    compact_data = {
+                        key: data[key]
+                        for key in (
+                            "status",
+                            "query",
+                            "search_query",
+                            "source",
+                            "result_count",
+                            "candidate_count",
+                            "search_queries",
+                            "limitations",
+                        )
+                        if key in data
+                    }
+
+                    articles = data.get("results", [])
+
+                    if not isinstance(articles, list):
+                        articles = []
+
+                    compact_data["results"] = [
+                        {
+                            key: article[key]
+                            for key in study_fields
+                            if key in article
+                        }
+                        for article in articles
+                        if isinstance(article, dict)
+                    ]
+
+                    message = message.model_copy(
+                        update={
+                            "content": json.dumps(
+                                compact_data,
+                                ensure_ascii=False,
+                            )
+                        }
+                    )
+
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        compacted_messages.append(message)
+
+    return compacted_messages
+
+MAX_TOOL_ITERATIONS = 4
+
 def agent_node(state: MessagesState) -> dict[str, Any]:
     """
     Let the language model dynamically decide whether to use tools
@@ -3271,12 +3345,12 @@ def agent_node(state: MessagesState) -> dict[str, Any]:
         }
 
     try:
-        print("[ROUTING] dynamic_agent")
+        prompt_messages = _compact_messages_for_llm(messages)
 
         response = llm_with_tools.invoke(
             [
                 SystemMessage(content=MEDICAL_SYSTEM_INSTRUCTIONS),
-                *messages,
+                *prompt_messages,
             ]
         )
 
@@ -3321,13 +3395,6 @@ def agent_node(state: MessagesState) -> dict[str, Any]:
             tool_calls=normalized_tool_calls,
         )
 
-        print(
-            "[ROUTING] selected_tools: "
-            + ", ".join(
-                call["name"] for call in normalized_tool_calls
-            )
-        )
-
         return {"messages": [response]}
 
     except Exception as exc:
@@ -3349,10 +3416,6 @@ def agent_node(state: MessagesState) -> dict[str, Any]:
                 )
             ]
         }
-
-
-
-MAX_TOOL_ITERATIONS = 4
 
 
 def route_after_agent(state: MessagesState) -> str:
