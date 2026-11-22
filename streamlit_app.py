@@ -26,7 +26,6 @@ st.set_page_config(
 
 MAX_INPUT_LENGTH = 4000
 
-
 # ==================================================
 # 2. Session State
 # ==================================================
@@ -503,11 +502,13 @@ if st.session_state.last_answer:
         interaction_found = data.get("interaction_found")
 
         if interaction_found is True:
-            st.warning("A potential interaction was identified.")
+            st.markdown("**Potential interaction identified**")
         elif interaction_found is False:
-            st.success("No matching interaction was found in the local database.")
+            st.success(
+                "No matching interaction was found in the local database."
+            )
         else:
-            st.info("The interaction status is uncertain.")
+            st.markdown("**Interaction status: Uncertain**")
 
         st.markdown("### Evidence")
         if evidence:
@@ -516,11 +517,10 @@ if st.session_state.last_answer:
         else:
             st.write("No evidence details were returned.")
 
-        st.markdown("### Limitations")
         if limitations:
-            for item in limitations:
-                st.write(f"- {item}")
-
+            with st.expander("Method Notes", expanded=False):
+                for item in limitations:
+                    st.write(f"- {item}")
         st.markdown("### Recommended Next Step")
         st.info(data.get("next_step", "Seek review by a qualified healthcare professional."))
 
@@ -621,7 +621,13 @@ if st.session_state.last_answer:
                     "Title not available"
                 )
 
+                title = study.get(
+                    "title",
+                    "Title not available"
+                )
+
                 pmid = str(study.get("pmid", "")).strip()
+                source_url = str(study.get("source_url", "")).strip()
 
                 journal = study.get(
                     "journal",
@@ -638,134 +644,110 @@ if st.session_state.last_answer:
                     "Abstract not available."
                 )
 
-                with st.container(border=True):
-                    header_col1, header_col2 = st.columns([5, 1])
-                    with header_col1:
-                        st.caption(f"STUDY {index}")
-                    with header_col2:
-                        st.caption(publication_date[:4] if publication_date[:4].isdigit() else "Year N/A")
-                    st.markdown(f"### {title}")
-                    st.caption(f"{journal}  ·  PMID: {pmid if pmid.isdigit() else 'N/A'}")
-                    if pmid.isdigit():
-                        st.markdown(
-                            f"[View publication on PubMed](https://pubmed.ncbi.nlm.nih.gov/{pmid}/)"
-                            )    
+                st.markdown(f"### {title}")
 
-                    with st.expander("Read Abstract"):
+                st.caption(
+                    f"{journal}  ·  PMID: {pmid if pmid.isdigit() else 'N/A'}"
+                )
 
-                        st.write(abstract)
-
-                    matched_terms = study.get(
-                        "matched_terms",
-                        []
+                if (
+                    pmid.isdigit()
+                    and source_url == f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
+                ):
+                    st.markdown(
+                        f"[View publication on PubMed]({source_url})"
                     )
 
-                    matched_markers = study.get(
-                        "matched_markers",
-                        []
+                with st.expander("Read Abstract"):
+                    st.write(abstract)
+
+                matched_terms = study.get("matched_terms", [])
+                matched_markers = study.get("matched_markers", [])
+                matched_queries = study.get("matched_queries", [])
+
+                if matched_terms:
+                    st.write(
+                        "**Matched Terms:** "
+                        + ", ".join(map(str, matched_terms))
                     )
 
-                    matched_queries = study.get(
-                        "matched_queries",
-                        []
+                if matched_markers:
+                    st.write(
+                        "**Matched Markers:** "
+                        + ", ".join(map(str, matched_markers))
                     )
 
-                    if matched_terms:
-
-                        st.write(
-                            "**Matched Terms:** "
-                            + ", ".join(map(str, matched_terms))
-                        )
-
-                    if matched_markers:
-
-                        st.write(
-                            "**Matched Markers:** "
-                            + ", ".join(map(str, matched_markers))
-                        )
-
-                    if matched_queries:
-
-                        st.write("**Matched Queries:**")
-
-                        for query in matched_queries:
-                            st.caption(f"• {query}")
-
-                    has_applicable_markers = bool(
-                     _get_applicable_marker_groups(
-                       st.session_state.last_question
-                     )
+                if matched_queries:
+                    st.write(
+                        "**Matched Queries:** "
+                        + ", ".join(map(str, matched_queries))
                     )
 
-                    marker_coverage = (
-                        study.get("marker_coverage_score", "N/A")
-                        if has_applicable_markers
-                        else "N/A"
+                has_applicable_markers = bool(
+                    _get_applicable_marker_groups(
+                        st.session_state.last_question
+                    )
+                )
+
+                marker_coverage = (
+                    study.get("marker_coverage_score", "N/A")
+                    if has_applicable_markers
+                    else "N/A"
+                )
+
+                score_col1, score_col2, score_col3, score_col4 = st.columns(4)
+
+                with score_col1:
+                    st.caption(
+                        f"Relevance Score: "
+                        f"{study.get('relevance_score', 'N/A')}"
                     )
 
-                    score_col1, score_col2, score_col3, score_col4 = st.columns(4)
+                with score_col2:
+                    st.caption(f"Marker Coverage: {marker_coverage}")
 
-                    with score_col1:
-                        st.caption(
-                            f"Relevance Score: "
-                            f"{study.get('relevance_score', 'N/A')}"
-                        )
+                with score_col3:
+                    st.caption(
+                        f"Age Relevance: "
+                        f"{study.get('age_relevance_score', 'N/A')}"
+                    )
 
-                    with score_col2:
-                        st.caption(
-                            f"Marker Coverage: "
-                            f"{marker_coverage}"
-                        )
+                with score_col4:
+                    st.caption(
+                        "Study Population: "
+                        f"{study.get('study_population_relevance', 'Not specified')}"
+                    )
 
-                    with score_col3:
-                        st.caption(
-                            f"Age Relevance: "
-                            f"{study.get('age_relevance_score', 'N/A')}"
-                        )
-                    with score_col4:
-                        st.caption(
-                            "Study Population: "
-                            f"{study.get('study_population_relevance', 'Not specified')}"
-                        )
-                        article_types = study.get("article_types", [])
-                        if article_types:
-                                st.caption(
-                                  "Article Types: "
-                                  + ", ".join(map(str, article_types))
-                                )
-                        else:
-                              st.caption("Article Types: Not specified")
-                        study_design = study.get(
-                            "study_design",
-                            "Not specified",
-                        )
-                        st.caption(f"Study Design: {study_design}")
+                article_types = study.get("article_types", [])
+                if article_types:
+                    st.caption(
+                        "Article Types: "
+                        + ", ".join(map(str, article_types))
+                    )
+                else:
+                    st.caption("Article Types: Not specified")
 
-                        
-                    if "pregnancy_related" in study:
+                study_design = study.get("study_design", "Not specified")
+                st.caption(f"Study Design: {study_design}")
 
-                        st.caption(
-                            "Pregnancy Related: "
-                            + (
-                                "Yes"
-                                if study["pregnancy_related"]
-                                else "No"
-                            )
+                if "pregnancy_related" in study:
+                    st.caption(
+                        "Pregnancy Related: "
+                        + (
+                            "Yes"
+                            if study["pregnancy_related"]
+                            else "No"
                         )
+                    )
 
         # ------------------------------------------
-        # Search Limitations
+        # Research Notes
         # ------------------------------------------
 
         if limitations:
-
-            with st.expander(
-                "Search Limitations and Notes",
-                expanded=False
-            ):
-
+            with st.expander("Research Notes", expanded=False):
                 for limitation in limitations:
-                    st.write(f"• {limitation}")
+                    st.write(f"- {limitation}")
 
     # ----------------------------------------------
     # Fallback for Non-JSON Responses
@@ -776,11 +758,6 @@ if st.session_state.last_answer:
         with st.container(border=True):
 
             st.markdown(answer)
-
-    st.caption(
-        "AI-generated research information. "
-        "Professional medical review is required."
-    )
 
     # ----------------------------------------------
     # Investigation Tools

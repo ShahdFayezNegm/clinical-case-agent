@@ -1,4 +1,4 @@
-﻿import json
+import json
 import os
 import re
 import uuid
@@ -26,7 +26,7 @@ llm = ChatOpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=os.getenv("OPENROUTER_API_KEY") or "not-configured",
     temperature=0,
-    max_tokens=512,
+    max_tokens=2048,
 )
 
 
@@ -3099,7 +3099,46 @@ Safety and accuracy requirements:
     seeking emergency medical care.
 12. Do not claim that the project's local interaction database
     is complete or clinically validated.
+13. When summarizing retrieved medical studies, classify
+    their applicability to the user's research question:
 
+    - Direct Evidence: The study investigates the same
+      intervention or exposure, outcome, and a sufficiently
+      similar patient population.
+    - Related Evidence: The study addresses a related
+      clinical question but differs in intervention,
+      comparator, outcome, or population.
+    - Limited Applicability: The study is based on a
+      substantially different or narrowly selected
+      population, setting, or clinical context.
+
+14. Never present related evidence or evidence with limited
+    applicability as direct evidence for the user's case.
+
+15. Explicitly identify important differences between
+    the study population and the population in the case.
+
+16. Do not generalize findings from triple antithrombotic
+    therapy to dual therapy, or from postoperative
+    populations to general outpatient populations,
+    without clearly explaining the limitations.
+
+17. Distinguish association from causation. Do not describe
+    observational findings as proof of causation.
+
+18. Preserve the distinction between statistically
+    significant and non-significant findings. Report
+    confidence intervals and study limitations when
+    available in the retrieved evidence.
+
+19. Use only study details actually returned by the
+    evidence retrieval tool. Never invent study results,
+    sample sizes, effect estimates, or conclusions.
+
+20. If the retrieved information is insufficient to
+    determine a study's applicability, explicitly state
+    that applicability cannot be established from the
+    available information.
 This prototype is for educational and software-development
 purposes, not for real clinical decision-making.
 

@@ -2751,3 +2751,42 @@ def test_dynamic_workflow_completes_tool_cycle(monkeypatch):
     ]
 
     assert len(tool_messages) == 1
+
+
+def test_agent_node_passes_evidence_applicability_instructions(
+    monkeypatch,
+):
+    import graph_app
+    from langchain_core.messages import AIMessage, HumanMessage
+
+    captured_messages = []
+
+    class FakeLLMWithTools:
+        def invoke(self, messages):
+            captured_messages.extend(messages)
+            return AIMessage(content="Evidence reviewed.")
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(
+        graph_app,
+        "llm_with_tools",
+        FakeLLMWithTools(),
+    )
+
+    graph_app.agent_node({
+        "messages": [
+            HumanMessage(
+                content="Find evidence about warfarin and aspirin."
+            )
+        ]
+    })
+
+    system_message = captured_messages[0]
+    instructions = system_message.content
+
+    assert "Direct Evidence" in instructions
+    assert "Related Evidence" in instructions
+    assert "Limited Applicability" in instructions
+    assert "Never present related evidence" in instructions
+    assert "Distinguish association from causation" in instructions
+    assert "Never invent study results" in instructions
