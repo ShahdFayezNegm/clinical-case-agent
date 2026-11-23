@@ -1,23 +1,24 @@
-# Clinical Case Investigation Agent
+﻿# Clinical Case Investigation Agent
 
 ## Live Demo
 
 [Open the Clinical Case Investigation Agent](https://clinical-case-agent-hprsmthe5cyheky74cnqsv.streamlit.app/)
 
-
 An experimental AI-powered clinical research assistant designed to support structured case investigation, medical evidence retrieval, and preliminary exploration of potential medication interactions.
 
-The application uses LangGraph to coordinate an LLM-based agent and its tools, with a Streamlit interface for submitting cases and reviewing structured results.
+The application uses LangGraph to coordinate a Gemini-powered agent and its tools, with a Streamlit interface for submitting cases and reviewing structured results.
 
 > **Important:** This project is an educational and research prototype. It is not a medical device and must not be used to diagnose conditions, prescribe treatments, or make medication decisions.
 
 ## Features
 
 - **Agentic workflow:** Uses LangGraph to let the agent decide when to call available tools and when to produce a final response.
+- **Gemini-powered agent:** Uses Google's Gemini model through LangChain Google GenAI integration.
 - **Medication interaction exploration:** Checks recognized medication pairs against a small local demonstration interaction database.
 - **PubMed evidence retrieval:** Searches medical literature through the NCBI Entrez E-utilities API.
 - **Structured investigation:** Organizes tool outputs, evidence details, limitations, and case-relevant context.
 - **Source traceability:** Displays study titles, PMIDs, and direct PubMed links for publications cited in the agent's final investigation report.
+- **Publication metadata:** Retrieves available publication metadata, including author information, from PubMed records.
 - **Streamlit interface:** Provides a workspace for submitting clinical case descriptions and reviewing investigation results.
 - **Bounded tool execution:** Limits the agent's tool-calling loop to help prevent uncontrolled iterations.
 
@@ -36,7 +37,7 @@ flowchart TD
     G --> H([End])
 ```
 
-### Workflow components
+### Workflow Components
 
 1. **Agent Node:** Processes the case and decides whether additional information or tool execution is needed.
 2. **Tool Node:** Executes the selected tool calls.
@@ -52,6 +53,7 @@ The agent can perform multiple tool calls when needed. The maximum number of too
 `check_drug_interactions`
 
 This tool:
+
 - Extracts recognized medication names and supported aliases.
 - Checks medication pairs against a local demonstration database.
 - Returns structured results, including detected medications, interaction status, evidence text, limitations, and next steps.
@@ -80,9 +82,10 @@ The local demonstration database currently contains two example interactions:
 This tool searches PubMed using the NCBI Entrez E-utilities API.
 
 It supports:
+
 - Constructing focused literature search queries.
 - Retrieving relevant publication metadata.
-- Extracting available article information.
+- Extracting available article information, including author metadata.
 - Considering case context, such as patient age and pregnancy status, when provided.
 - Returning publication identifiers and source links where available.
 
@@ -97,9 +100,9 @@ The application applies heuristic relevance logic to retrieved results.
 | Programming language | Python |
 | User interface | Streamlit |
 | Agent orchestration | LangGraph |
-| LLM integration | LangChain OpenAI integration |
-| LLM provider | OpenRouter |
-| Configured model | `qwen/qwen3.7-plus` |
+| LLM integration | LangChain Google GenAI |
+| LLM provider | Google Gemini |
+| Configured model | `gemini-3.5-flash-lite` |
 | Medical literature | PubMed / NCBI E-utilities |
 | HTTP requests | Requests |
 | Testing | Pytest |
@@ -108,28 +111,28 @@ The application applies heuristic relevance logic to retrieved results.
 
 ```text
 clinical-case-agent/
-│
-├── graph_app.py
-│   └── LangGraph workflow, agent logic, tools, and validation
-│
-├── streamlit_app.py
-│   └── Streamlit user interface
-│
-├── requirements.txt
-│   └── Project dependencies
-│
-├── test_graph_app.py
-├── test_integration.py
-├── test_routing.py
-├── test_drug_interaction_pairs.py
-├── test_medication_extraction.py
-├── test_pubmed.py
-│   └── Automated tests
-│
-├── .streamlit/
-│   └── secrets.toml (local configuration; do not commit)
-│
-└── README.md
+|
+|-- graph_app.py
+|   `-- LangGraph workflow, agent logic, tools, and validation
+|
+|-- streamlit_app.py
+|   `-- Streamlit user interface
+|
+|-- requirements.txt
+|   `-- Project dependencies
+|
+|-- test_graph_app.py
+|-- test_integration.py
+|-- test_routing.py
+|-- test_drug_interaction_pairs.py
+|-- test_medication_extraction.py
+|-- test_pubmed.py
+|   `-- Automated tests
+|
+|-- .streamlit/
+|   `-- secrets.toml (local configuration; do not commit)
+|
+`-- README.md
 ```
 
 ## Getting Started
@@ -138,17 +141,17 @@ clinical-case-agent/
 
 - Python 3.10 or later
 - pip
-- An OpenRouter API key
-- Internet connection for OpenRouter requests and PubMed searches
+- A Google Gemini API key
+- Internet connection for Gemini API requests and PubMed searches
 
-### 1. Clone the repository
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/ShahdFayezNegm/clinical-case-agent.git
 cd clinical-case-agent
 ```
 
-### 2. Create a virtual environment
+### 2. Create a Virtual Environment
 
 **Windows PowerShell:**
 
@@ -164,13 +167,13 @@ python3 -m venv venv
 source venv/bin/activate
 ```
 
-### 3. Install dependencies
+### 3. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configure the OpenRouter API key
+### 4. Configure the Gemini API Key
 
 Create the Streamlit secrets directory if it does not already exist:
 
@@ -181,7 +184,7 @@ New-Item -ItemType Directory -Force .streamlit
 Create `.streamlit/secrets.toml` with the following content:
 
 ```toml
-OPENROUTER_API_KEY = "your-openrouter-api-key"
+GEMINI_API_KEY = "your-gemini-api-key"
 ```
 
 Alternatively, set the environment variable.
@@ -189,12 +192,14 @@ Alternatively, set the environment variable.
 **Windows PowerShell:**
 
 ```powershell
-$env:OPENROUTER_API_KEY = "your-openrouter-api-key"
+$env:GEMINI_API_KEY = "your-gemini-api-key"
 ```
+
+For Streamlit Community Cloud deployment, add `GEMINI_API_KEY` under the application's **Settings → Secrets** section.
 
 Never commit API keys or other secrets to GitHub.
 
-### 5. Run the application
+### 5. Run the Application
 
 ```bash
 streamlit run streamlit_app.py
@@ -218,7 +223,7 @@ python -m pytest -q
 
 The tests cover application logic, agent routing, medication extraction, interaction checking, PubMed functionality, and integration scenarios.
 
-Integration tests use controlled test doubles and mocked external requests where applicable; they do not require a real OpenRouter API call for every test.
+Integration tests use controlled test doubles and mocked external requests where applicable; they do not require a real Gemini API call for every test.
 
 ## Example Investigation Scenario
 
@@ -251,7 +256,7 @@ The application uses Streamlit session state to temporarily maintain the current
 
 External services are used for the following operations:
 
-- **OpenRouter:** Processes case information through the configured language model.
+- **Google Gemini API:** Processes case information through the configured language model.
 - **NCBI PubMed:** Retrieves medical literature based on the investigation queries.
 
 For privacy and data protection, users should submit fictional or properly anonymized cases only. Personal identifiers and confidential patient information should not be entered.
@@ -261,6 +266,7 @@ Data processing is also subject to the privacy and data-handling policies of the
 ## Disclaimer
 
 This project is developed for educational and research purposes. It is a prototype for AI-assisted clinical case investigation and is not intended for independent clinical decision-making. Professional healthcare review is required before any clinical use of the information it produces.
+
 ## About Me
 
 **Shahd Fayez Negm**
@@ -269,6 +275,7 @@ Computer Science and Artificial Intelligence graduate interested in AI Engineeri
 
 - **GitHub:** [ShahdFayezNegm](https://github.com/ShahdFayezNegm)
 - **LinkedIn:** [LinkedIn Profile](https://linkedin.com/in/shahd-fayez-70b9a331b)
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
