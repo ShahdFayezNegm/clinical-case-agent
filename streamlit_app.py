@@ -1,4 +1,5 @@
 import json
+import re
 import os
 import streamlit as st
 from langchain_core.messages import HumanMessage, ToolMessage
@@ -19,7 +20,7 @@ from graph_app import graph, _get_applicable_marker_groups
 
 st.set_page_config(
     page_title="Clinical Case Investigation",
-    page_icon="🩺",
+    page_icon="ðŸ©º",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -41,7 +42,8 @@ if "used_tools" not in st.session_state:
 
 if "case_input" not in st.session_state:
     st.session_state.case_input = ""
-
+if "pubmed_results" not in st.session_state:
+    st.session_state.pubmed_results = []
 
 # ==================================================
 # 3. Custom Styling
@@ -232,11 +234,12 @@ with st.sidebar:
 
     st.markdown("### Workspace")
 
-    if st.button("＋  New Investigation", use_container_width=True):
+    if st.button("ï¼‹  New Investigation", use_container_width=True):
 
         st.session_state.last_question = ""
         st.session_state.last_answer = None
         st.session_state.used_tools = []
+        st.session_state.pubmed_results = []
         st.session_state.case_input = ""
         st.rerun()
 
@@ -383,6 +386,7 @@ if submitted:
         st.session_state.last_question = question
         st.session_state.last_answer = None
         st.session_state.used_tools = []
+        st.session_state.pubmed_results = []
 
         try:
 
@@ -420,18 +424,36 @@ if submitted:
 
                 
                 used_tools = []
-
+                pubmed_results = []
                 for message in messages:
                     if isinstance(message, ToolMessage):
                         tool_name = message.name
-
-                        if (
-                            tool_name
-                            and tool_name not in used_tools
-                        ):
+                        if tool_name and tool_name not in used_tools:
                             used_tools.append(tool_name)
+                        if tool_name == "search_medical_evidence":
+                            try:
+                                tool_data = (
+                                    json.loads(message.content)
+                                    if isinstance(message.content, str)
+                                    else message.content
+                                )
+                                if isinstance(tool_data, dict):
+                                    results = tool_data.get("results", [])
+                                    if isinstance(results, list):
+                                        pubmed_results.extend(
+                                            article
+                                            for article in results
+                                            if isinstance(article, dict)
+                                        )
+                            except (json.JSONDecodeError, TypeError):
+                                print(
+                                    "[WARNING] Could not parse PubMed tool results."
+                                )
 
                 st.session_state.used_tools = used_tools
+                st.session_state.pubmed_results = pubmed_results
+
+
                 st.session_state.last_answer = answer
                 st.rerun() 
 
@@ -647,7 +669,7 @@ if st.session_state.last_answer:
                 st.markdown(f"### {title}")
 
                 st.caption(
-                    f"{journal}  ·  PMID: {pmid if pmid.isdigit() else 'N/A'}"
+                    f"{journal}  Â·  PMID: {pmid if pmid.isdigit() else 'N/A'}"
                 )
 
                 if pmid.isdigit():
@@ -758,7 +780,48 @@ if st.session_state.last_answer:
         with st.container(border=True):
 
             st.markdown(answer)
+    # ----------------------------------------------
+    # Retrieved Medical Literature
+    # ----------------------------------------------
 
+    if st.session_state.pubmed_results:
+
+        cited_pmids = set(
+            re.findall(
+                r"\bPMID\s*:?\s*(\d{7,9})\b",
+                answer,
+                re.IGNORECASE,
+            )
+        )
+
+        cited_studies = [
+            study
+            for study in st.session_state.pubmed_results
+            if str(study.get("pmid", "")) in cited_pmids
+            and study.get("source_url")
+        ]
+
+        if cited_studies:
+
+            st.markdown("---")
+            st.subheader("Retrieved Medical Literature")
+
+            for study in cited_studies:
+
+                title = study.get(
+                    "title",
+                    "Untitled study",
+                )
+
+                pmid = study.get("pmid")
+                source_url = study.get("source_url")
+
+                st.markdown(f"**{title}**")
+                st.caption(f"PMID: {pmid}")
+
+                st.markdown(
+                    f"[View publication on PubMed]({source_url})"
+                )
     # ----------------------------------------------
     # Investigation Tools
     # ----------------------------------------------
@@ -771,7 +834,7 @@ if st.session_state.last_answer:
         ):
 
             for tool_name in st.session_state.used_tools:
-                st.write(f"• {tool_name}")
+                st.write(f"â€¢ {tool_name}")
 
 
 # ==================================================
@@ -795,7 +858,7 @@ with st.expander("Privacy and Data Handling"):
 st.markdown(
     """
     <div class="footer-text">
-        Clinical Research Workspace · Powered by LangGraph and OpenRouter
+        Clinical Research Workspace Â· Powered by LangGraph and OpenRouter
     </div>
     """,
     unsafe_allow_html=True,

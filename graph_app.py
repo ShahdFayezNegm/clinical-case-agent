@@ -3141,7 +3141,14 @@ Safety and accuracy requirements:
     available information.
 This prototype is for educational and software-development
 purposes, not for real clinical decision-making.
-
+21. When using results from the search_medical_evidence tool:
+    - Include the study title and PMID for each study discussed.
+    - Do not cite studies that were not returned by the tool.
+    - Do not create a separate References or Retrieved Medical
+      Literature section.
+    - PubMed references and clickable publication links are
+      displayed separately by the application.
+    - Do not construct, modify, or invent publication URLs.
 Answer the user's question below.
 """
 
