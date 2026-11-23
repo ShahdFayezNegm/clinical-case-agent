@@ -834,7 +834,7 @@ if st.session_state.last_answer:
         ):
 
             for tool_name in st.session_state.used_tools:
-                st.write(f"â€¢ {tool_name}")
+                st.write(f"• {tool_name}")
 
 
 # ==================================================
