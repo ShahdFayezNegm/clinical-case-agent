@@ -234,7 +234,7 @@ with st.sidebar:
 
     st.markdown("### Workspace")
 
-    if st.button("ï¼‹  New Investigation", use_container_width=True):
+    if st.button("+ New Investigation", use_container_width=True):
 
         st.session_state.last_question = ""
         st.session_state.last_answer = None
