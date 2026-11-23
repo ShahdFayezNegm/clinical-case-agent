@@ -1776,7 +1776,7 @@ def test_agent_node_passes_patient_pregnancy_status(monkeypatch):
                 ],
             )
 
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     monkeypatch.setattr(
         graph_app,
         "llm_with_tools",
@@ -2398,7 +2398,7 @@ def test_agent_node_returns_direct_llm_answer(monkeypatch):
                 content="Vitamin B12 is important for nerve function.",
             )
 
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     monkeypatch.setattr(
         graph_app,
         "llm_with_tools",
@@ -2443,7 +2443,7 @@ def test_agent_node_accepts_dynamic_drug_interaction_tool_call(
                 ],
             )
 
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     monkeypatch.setattr(
         graph_app,
         "llm_with_tools",
@@ -2627,7 +2627,7 @@ def test_dynamic_workflow_completes_tool_cycle(monkeypatch):
     from langgraph.graph import StateGraph, START, END
     from langgraph.graph import MessagesState
 
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
 
     class FakeLLMWithTools:
         def __init__(self):
@@ -2766,7 +2766,7 @@ def test_agent_node_passes_evidence_applicability_instructions(
             captured_messages.extend(messages)
             return AIMessage(content="Evidence reviewed.")
 
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     monkeypatch.setattr(
         graph_app,
         "llm_with_tools",

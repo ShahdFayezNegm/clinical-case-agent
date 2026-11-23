@@ -82,7 +82,7 @@ def make_tool_calling_llm(tool_name, tool_args):
 def test_graph_end_to_end_drug_interaction(monkeypatch):
 
     monkeypatch.setenv(
-        "OPENROUTER_API_KEY",
+        "GEMINI_API_KEY",
         "test-key",
     )
 
@@ -133,7 +133,7 @@ def test_graph_end_to_end_pubmed_search(
 ):
 
     monkeypatch.setenv(
-        "OPENROUTER_API_KEY",
+        "GEMINI_API_KEY",
         "test-key",
     )
 
@@ -232,7 +232,7 @@ def test_graph_end_to_end_pubmed_search(
 def test_graph_general_question(monkeypatch):
 
     monkeypatch.setenv(
-        "OPENROUTER_API_KEY",
+        "GEMINI_API_KEY",
         "test-key",
     )
 
@@ -277,7 +277,7 @@ def test_graph_general_question(monkeypatch):
 def test_graph_handles_llm_failure(monkeypatch):
 
     monkeypatch.setenv(
-        "OPENROUTER_API_KEY",
+        "GEMINI_API_KEY",
         "test-key",
     )
 

@@ -2,7 +2,7 @@
 import os
 import re
 import uuid
-import time
+from time import sleep as _sleep
 import requests
 import xml.etree.ElementTree as ET
 from datetime import date
@@ -2828,7 +2828,7 @@ def search_medical_evidence(
                         f"HTTP 429, retrying in {wait_seconds}s "
                         f"(attempt {attempt + 1}/3)"
                     )
-                    time.sleep(wait_seconds)
+                    _sleep(wait_seconds)
 
             print(
                 f"[PUBMED] Query {query_index}: "
@@ -2920,7 +2920,7 @@ def search_medical_evidence(
                     flush=True,
                 )
 
-                time.sleep(wait_seconds)
+                _sleep(wait_seconds)
 
         print(
             f"[PUBMED] EFetch HTTP "

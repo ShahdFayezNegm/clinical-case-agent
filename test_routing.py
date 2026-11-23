@@ -37,7 +37,7 @@ def make_tool_call(name, args=None):
 def test_agent_node_preserves_model_selected_drug_interaction_tool(
     monkeypatch,
 ):
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
 
     question = "Does warfarin interact with aspirin?"
 
@@ -67,7 +67,7 @@ def test_agent_node_preserves_model_selected_drug_interaction_tool(
 
 
 def test_evidence_request_preserves_original_question(monkeypatch):
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
 
     question = (
         "Find clinical evidence about iron deficiency anemia "
@@ -97,7 +97,7 @@ def test_evidence_request_preserves_original_question(monkeypatch):
 
 
 def test_evidence_request_adds_patient_context(monkeypatch):
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
 
     question = (
         "Find medical evidence about anemia "
@@ -137,7 +137,7 @@ def test_evidence_request_adds_patient_context(monkeypatch):
 
 
 def test_evidence_request_generates_query_when_missing(monkeypatch):
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
 
     question = (
         "Find diagnostic accuracy studies about deep learning "
@@ -176,7 +176,7 @@ def test_evidence_request_generates_query_when_missing(monkeypatch):
 def test_agent_node_returns_direct_answer_without_tool_calls(
     monkeypatch,
 ):
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
 
     expected_answer = "Warfarin is an anticoagulant."
 
@@ -202,7 +202,7 @@ def test_agent_node_returns_direct_answer_without_tool_calls(
 
 
 def test_agent_node_handles_llm_failure(monkeypatch):
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
 
     fake_llm = make_fake_llm(
         error=RuntimeError("Test model failure")
@@ -226,7 +226,7 @@ def test_agent_node_handles_llm_failure(monkeypatch):
 
 
 def test_agent_node_handles_empty_question(monkeypatch):
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
 
     fake_llm = make_fake_llm()
     monkeypatch.setattr(graph_app, "llm_with_tools", fake_llm)
@@ -240,7 +240,7 @@ def test_agent_node_handles_empty_question(monkeypatch):
 
 
 def test_agent_node_handles_missing_api_key(monkeypatch):
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
     fake_llm = make_fake_llm()
     monkeypatch.setattr(graph_app, "llm_with_tools", fake_llm)
