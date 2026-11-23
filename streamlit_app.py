@@ -1,16 +1,16 @@
-import json
+﻿import json
 import re
 import os
 import streamlit as st
 from langchain_core.messages import HumanMessage, ToolMessage
 
 try:
-    api_key = st.secrets.get("OPENROUTER_API_KEY", "")
+    api_key = st.secrets.get("GEMINI_API_KEY", "")
 except Exception:
     api_key = ""
 
 if api_key:
-    os.environ["OPENROUTER_API_KEY"] = api_key
+    os.environ["GEMINI_API_KEY"] = api_key
 
 from graph_app import graph, _get_applicable_marker_groups
 
@@ -20,7 +20,7 @@ from graph_app import graph, _get_applicable_marker_groups
 
 st.set_page_config(
     page_title="Clinical Case Investigation",
-    page_icon="ðŸ©º",
+    page_icon="🩺",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -257,7 +257,7 @@ with st.sidebar:
 
     st.caption("SYSTEM INFORMATION")
     st.caption("Workflow: LangGraph")
-    st.caption("Cloud model: OpenRouter")
+    st.caption("Cloud model: Gemini")
     st.caption("Mode: Research Prototype")
 
 
@@ -669,7 +669,7 @@ if st.session_state.last_answer:
                 st.markdown(f"### {title}")
 
                 st.caption(
-                    f"{journal}  Â·  PMID: {pmid if pmid.isdigit() else 'N/A'}"
+                    f"{journal}  ·  PMID: {pmid if pmid.isdigit() else 'N/A'}"
                 )
 
                 if pmid.isdigit():
@@ -844,7 +844,7 @@ with st.expander("Privacy and Data Handling"):
 st.markdown(
     """
     <div class="footer-text">
-        Clinical Research Workspace Â· Powered by LangGraph and OpenRouter
+        Clinical Research Workspace · Powered by LangGraph and Gemini
     </div>
     """,
     unsafe_allow_html=True,

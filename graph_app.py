@@ -10,7 +10,7 @@ from typing import Any
 from itertools import combinations
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage, RemoveMessage, SystemMessage
 from langchain_core.tools import tool
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.prebuilt import ToolNode
 
@@ -19,12 +19,11 @@ from langgraph.prebuilt import ToolNode
 # 1. MODEL CONFIGURATION
 # ============================================================
 
-MODEL_NAME = "qwen/qwen3.7-plus"
+MODEL_NAME = "gemini-3.5-flash-lite"
 
-llm = ChatOpenAI(
+llm = ChatGoogleGenerativeAI(
     model=MODEL_NAME,
-    base_url="https://openrouter.ai/api/v1",
-    api_key=os.getenv("OPENROUTER_API_KEY") or "not-configured",
+    google_api_key=os.getenv("GEMINI_API_KEY") or "not-configured",
     temperature=0,
     max_tokens=4096,
 )
@@ -295,6 +294,7 @@ def validate_pubmed_result(result: Any) -> bool:
             "matched_queries",
             "matched_markers",
             "article_types",
+            "authors",
         ):
             if field in article:
                 if not isinstance(article[field], list):
@@ -774,6 +774,37 @@ def _xml_text(element: ET.Element, path: str) -> str:
         return ""
 
     return " ".join("".join(found.itertext()).split())
+
+
+def _extract_authors(article: ET.Element) -> list[str]:
+    """Extract author names exactly as supplied by PubMed."""
+
+    authors = []
+
+    for author in article.findall(
+        ".//MedlineCitation/Article/AuthorList/Author"
+    ):
+        collective_name = _xml_text(author, "CollectiveName")
+
+        if collective_name:
+            name = collective_name
+        else:
+            fore_name = (
+                _xml_text(author, "ForeName")
+                or _xml_text(author, "Initials")
+            )
+            last_name = _xml_text(author, "LastName")
+            suffix = _xml_text(author, "Suffix")
+
+            name = " ".join(
+                part for part in (fore_name, last_name, suffix)
+                if part
+            )
+
+        if name:
+            authors.append(name)
+
+    return list(dict.fromkeys(authors))
 
 
 def _get_abstract(article: ET.Element) -> str:
@@ -2933,6 +2964,7 @@ def search_medical_evidence(
                 )
 
             abstract = _get_abstract(article)
+            authors = _extract_authors(article)
             article_types = _extract_article_types(article)
             study_design = _extract_study_design(
                article_title,
@@ -2976,6 +3008,7 @@ def search_medical_evidence(
                     "journal": journal_title or "Journal unavailable",
                     "publication_date": publication_date or "Not available",
                     "abstract": abstract or "Abstract unavailable",
+                    "authors": authors,
                     "source_url": (
                         f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
                         if pmid else ""
@@ -3149,6 +3182,11 @@ purposes, not for real clinical decision-making.
     - PubMed references and clickable publication links are
       displayed separately by the application.
     - Do not construct, modify, or invent publication URLs.
+    - Author names may only be reported if they appear in the
+      authors field returned by the PubMed retrieval tool.
+    - Never guess, infer, or substitute author names from memory.
+    - If the authors field is empty or unavailable, do not name
+      the authors; refer to the study by its title and PMID.
 Answer the user's question below.
 """
 
@@ -3259,6 +3297,7 @@ def _compact_messages_for_llm(messages):
         "journal",
         "publication_date",
         "abstract",
+        "authors",
         "source_url",
         "study_design",
         "article_types",
@@ -3338,13 +3377,13 @@ def agent_node(state: MessagesState) -> dict[str, Any]:
             ]
         }
 
-    if not os.getenv("OPENROUTER_API_KEY"):
+    if not os.getenv("GEMINI_API_KEY"):
         return {
             "messages": [
                 AIMessage(
                     content=(
                         "The language model is not configured. "
-                        "Please add OPENROUTER_API_KEY to the "
+                        "Please add GEMINI_API_KEY to the "
                         "application secrets."
                     )
                 )
@@ -3406,7 +3445,7 @@ def agent_node(state: MessagesState) -> dict[str, Any]:
 
     except Exception as exc:
         print(
-            f"[ERROR] OpenRouter request failed: "
+            f"[ERROR] Gemini request failed: "
             f"{type(exc).__name__}: {exc}"
         )
 
@@ -3415,7 +3454,7 @@ def agent_node(state: MessagesState) -> dict[str, Any]:
                 AIMessage(
                     content=(
                         "I could not generate a response because "
-                        "the OpenRouter language model encountered "
+                        "the Gemini language model encountered "
                         "an error. Please try again later. "
                         "Technical detail: "
                         f"{type(exc).__name__}: {exc}"
