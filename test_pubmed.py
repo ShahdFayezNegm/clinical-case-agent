@@ -762,7 +762,7 @@ def test_search_medical_evidence_includes_diagnostics_when_no_articles_are_selec
 
 
 @patch("graph_app.requests.get")
-@patch("graph_app.time.sleep")
+@patch("graph_app._sleep")
 def test_search_medical_evidence_retries_after_http_429(
     mock_sleep,
     mock_get,
@@ -805,7 +805,7 @@ def test_search_medical_evidence_retries_after_http_429(
     mock_sleep.assert_called_once_with(0.0)
 
 @patch("graph_app.requests.get")
-@patch("graph_app.time.sleep")
+@patch("graph_app._sleep")
 def test_esearch_uses_exponential_backoff_without_retry_after(
     mock_sleep,
     mock_get,
@@ -828,7 +828,7 @@ def test_esearch_uses_exponential_backoff_without_retry_after(
 
     esearch_attempts = {"count": 0}
 @patch("graph_app.requests.get")
-@patch("graph_app.time.sleep")
+@patch("graph_app._sleep")
 def test_esearch_uses_exponential_backoff_for_two_retries(
     mock_sleep,
     mock_get,
@@ -876,7 +876,7 @@ def test_esearch_uses_exponential_backoff_for_two_retries(
         10,
     ]
 @patch("graph_app.requests.get")
-@patch("graph_app.time.sleep")
+@patch("graph_app._sleep")
 def test_search_medical_evidence_stops_after_three_http_429_responses(
     mock_sleep,
     mock_get,
@@ -897,7 +897,7 @@ def test_search_medical_evidence_stops_after_three_http_429_responses(
     assert mock_sleep.call_count == 2
 
 @patch("graph_app.requests.get")
-@patch("graph_app.time.sleep")
+@patch("graph_app._sleep")
 def test_efetch_retries_after_http_429(
     mock_sleep,
     mock_get,
@@ -944,7 +944,7 @@ def test_efetch_retries_after_http_429(
     assert efetch_attempts["count"] == 2
     mock_sleep.assert_called_once_with(0.0)
 @patch("graph_app.requests.get")
-@patch("graph_app.time.sleep")
+@patch("graph_app._sleep")
 def test_efetch_uses_exponential_backoff_without_retry_after(
     mock_sleep,
     mock_get,
@@ -989,7 +989,7 @@ def test_efetch_uses_exponential_backoff_without_retry_after(
     assert efetch_attempts["count"] == 2
     mock_sleep.assert_called_once_with(5)
 @patch("graph_app.requests.get")
-@patch("graph_app.time.sleep")
+@patch("graph_app._sleep")
 def test_efetch_uses_exponential_backoff_for_two_retries(
     mock_sleep,
     mock_get,
@@ -1037,7 +1037,7 @@ def test_efetch_uses_exponential_backoff_for_two_retries(
         10,
     ]
 @patch("graph_app.requests.get")
-@patch("graph_app.time.sleep")
+@patch("graph_app._sleep")
 def test_efetch_stops_after_three_http_429_responses(
     mock_sleep,
     mock_get,
