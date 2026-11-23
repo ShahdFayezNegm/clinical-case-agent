@@ -783,36 +783,22 @@ if st.session_state.last_answer:
     # ----------------------------------------------
     # Retrieved Medical Literature
     # ----------------------------------------------
-
     if st.session_state.pubmed_results:
 
-        cited_pmids = set(
-            re.findall(
-                r"\bPMID\s*:?\s*(\d{7,9})\b",
-                answer,
-                re.IGNORECASE,
-            )
-        )
-
-        cited_studies = [
+        available_studies = [
             study
             for study in st.session_state.pubmed_results
-            if str(study.get("pmid", "")) in cited_pmids
-            and study.get("source_url")
+            if study.get("source_url")
         ]
 
-        if cited_studies:
+        if available_studies:
 
             st.markdown("---")
             st.subheader("Retrieved Medical Literature")
 
-            for study in cited_studies:
+            for study in available_studies:
 
-                title = study.get(
-                    "title",
-                    "Untitled study",
-                )
-
+                title = study.get("title", "Untitled study")
                 pmid = study.get("pmid")
                 source_url = study.get("source_url")
 
