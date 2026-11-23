@@ -17,7 +17,7 @@ The application uses LangGraph to coordinate an LLM-based agent and its tools, w
 - **Medication interaction exploration:** Checks recognized medication pairs against a small local demonstration interaction database.
 - **PubMed evidence retrieval:** Searches medical literature through the NCBI Entrez E-utilities API.
 - **Structured investigation:** Organizes tool outputs, evidence details, limitations, and case-relevant context.
-- **Source traceability:** Displays retrieved publication information and PubMed links when available.
+- **Source traceability:** Displays study titles, PMIDs, and direct PubMed links for publications cited in the agent's final investigation report.
 - **Streamlit interface:** Provides a workspace for submitting clinical case descriptions and reviewing investigation results.
 - **Bounded tool execution:** Limits the agent's tool-calling loop to help prevent uncontrolled iterations.
 
