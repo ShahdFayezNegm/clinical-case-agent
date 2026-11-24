@@ -421,7 +421,7 @@ if submitted:
 
                 if not isinstance(answer, str):
                     answer = str(answer)
-
+                answer = answer.replace(r"\*\*", "**")
                 
                 used_tools = []
                 pubmed_results = []
